@@ -25,6 +25,8 @@ public class OrderService {
     private final FinancialRecordRepository financialRecordRepository;
     private final OrderSessionRepository orderSessionRepository;
     private final OperationLogRepository operationLogRepository;
+    private final BossRepository bossRepository;
+    private final OrderBalanceService orderBalanceService;
 
     @Transactional
     public Order createOrder(CreateOrderRequest request, User currentUser) {
@@ -47,8 +49,42 @@ public class OrderService {
             order.setPlayerCount(Order.PlayerCount.SINGLE);
         }
 
+        // 设置客户类型和老板信息
+        if (request.getCustomerType() != null) {
+            order.setCustomerType(Order.CustomerType.valueOf(request.getCustomerType()));
+        } else {
+            order.setCustomerType(Order.CustomerType.SCATTER);
+        }
+
+        BigDecimal shortfall = BigDecimal.ZERO;
+        if (request.getBossId() != null && order.getCustomerType() == Order.CustomerType.REGULAR) {
+            Boss boss = bossRepository.findById(request.getBossId())
+                    .orElseThrow(() -> new RuntimeException("老板不存在"));
+            order.setBoss(boss);
+            order.setOriginalAmount(request.getOriginalAmount());
+            order.setDiscountRate(request.getDiscountRate());
+            order.setUseBalance(request.getUseBalance());
+
+            // 如果使用余额支付，扣减余额
+            if (Boolean.TRUE.equals(request.getUseBalance())) {
+                shortfall = orderBalanceService.deductBalance(order, boss, request.getTotalAmount());
+            }
+        }
+
         Order saved = orderRepository.save(order);
-        logOperation(saved, currentUser, "CREATE", null, Order.Status.PENDING_ASSIGN, "创建订单");
+        
+        // 如果有差价，添加到备注
+        String remark = "创建订单";
+        if (shortfall.compareTo(BigDecimal.ZERO) > 0) {
+            remark += "，预存余额不足，需补差价：¥" + shortfall;
+            // 更新订单备注
+            String originalRemark = saved.getRemark();
+            String balanceRemark = "【余额不足】需补差价：¥" + shortfall;
+            saved.setRemark((originalRemark != null ? originalRemark + "\n" : "") + balanceRemark);
+            orderRepository.save(saved);
+        }
+        
+        logOperation(saved, currentUser, "CREATE", null, Order.Status.PENDING_ASSIGN, remark);
         return saved;
     }
 
@@ -430,6 +466,14 @@ public class OrderService {
                 totalActualHours = request.getActualHours();
             }
             order.setActualHours(totalActualHours);
+
+            // 保存截图URL
+            if (request.getStartScreenshotUrl() != null) {
+                order.setStartScreenshotUrl(request.getStartScreenshotUrl());
+            }
+            if (request.getEndScreenshotUrl() != null) {
+                order.setEndScreenshotUrl(request.getEndScreenshotUrl());
+            }
 
             // 获取当前订单的总金额（不可变）
             BigDecimal totalAmount = order.getTotalAmount();

@@ -49,4 +49,8 @@ public interface FinancialRecordRepository extends JpaRepository<FinancialRecord
     List<PlayerIncomeSummary> findTopPlayerIncomes(Pageable pageable);
     
     List<FinancialRecord> findByOrderId(Long orderId);
+    
+    int deleteByOrderId(Long orderId);
+    
+    int deleteByCreatedAtBefore(LocalDateTime createdAt);
 }

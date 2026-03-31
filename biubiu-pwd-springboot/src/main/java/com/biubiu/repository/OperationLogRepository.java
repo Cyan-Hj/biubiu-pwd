@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface OperationLogRepository extends JpaRepository<OperationLog, Long> {
     List<OperationLog> findByOrderIdOrderByCreatedAtDesc(Long orderId);
+    
+    int deleteByOrderId(Long orderId);
 }

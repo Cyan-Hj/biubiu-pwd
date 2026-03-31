@@ -26,11 +26,80 @@
                 <span class="unit-label">%</span>
                 <div class="form-tip">陪玩师收入 = 订单金额 × (1 - 平台抽成比例)</div>
               </el-form-item>
+              <el-divider />
+              <h4 class="section-title">订单自动清理</h4>
+              <el-form-item label="启用自动清理">
+                <el-switch
+                  v-model="configForm.order_cleanup_enabled"
+                  active-text="启用"
+                  inactive-text="禁用"
+                />
+                <div class="form-tip">启用后，系统将每天凌晨3点自动清理过期的已完成/已取消订单</div>
+              </el-form-item>
+              <el-form-item label="清理周期">
+                <el-input-number
+                  v-model="configForm.order_cleanup_days"
+                  :min="1"
+                  :max="365"
+                  :step="1"
+                  :disabled="!configForm.order_cleanup_enabled"
+                  size="large"
+                />
+                <span class="unit-label">天前的订单</span>
+                <div class="form-tip">将清理指定天数前的已完成和已取消订单</div>
+              </el-form-item>
+              <el-form-item label="清除陪玩师收入">
+                <el-switch
+                  v-model="configForm.clear_player_income"
+                  :disabled="!configForm.order_cleanup_enabled"
+                  active-text="启用"
+                  inactive-text="禁用"
+                />
+                <div class="form-tip danger">启用后，清理订单时将同时清零所有陪玩师的累计收入和可提现余额，此操作不可恢复！</div>
+              </el-form-item>
               <el-form-item>
                 <el-button type="primary" size="large" @click="saveConfig" :loading="saving">
                   <el-icon><Check /></el-icon>
                   保存设置
                 </el-button>
+              </el-form-item>
+              <el-divider />
+              <h4 class="section-title">手动清理订单</h4>
+              <el-form-item label="截止日期">
+                <el-date-picker
+                  v-model="manualCleanupForm.cutoffDate"
+                  type="date"
+                  placeholder="选择截止日期"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                />
+                <div class="form-tip">将清理此日期及之前创建的所有订单（包含当天）</div>
+              </el-form-item>
+              <el-form-item label="清理选项">
+                <el-checkbox v-model="manualCleanupForm.cleanupCompleted">清理已完成订单</el-checkbox>
+                <el-checkbox v-model="manualCleanupForm.cleanupCancelled">清理已取消订单</el-checkbox>
+              </el-form-item>
+              <el-form-item label="清除收入">
+                <el-switch
+                  v-model="manualCleanupForm.clearPlayerIncome"
+                  active-text="是"
+                  inactive-text="否"
+                />
+                <div class="form-tip danger">启用后，清理订单时将同时清零所有陪玩师的累计收入和可提现余额</div>
+              </el-form-item>
+              <el-form-item label="手动清理">
+                <el-button 
+                  type="danger" 
+                  plain
+                  :disabled="!canManualCleanup"
+                  :loading="cleanupLoading"
+                  @click="handleManualCleanup"
+                >
+                  <el-icon><Delete /></el-icon>
+                  立即清理
+                </el-button>
+                <div class="form-tip danger">手动清理将立即删除所有符合条件的订单{{ manualCleanupForm.clearPlayerIncome ? '，并清零所有陪玩师的累计收入' : '' }}，此操作不可恢复！</div>
               </el-form-item>
             </el-form>
           </div>
@@ -350,7 +419,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   getSystemConfig, 
@@ -364,7 +433,8 @@ import {
   createSystemOption,
   updateSystemOption,
   deleteSystemOption,
-  sortSystemOptions
+  sortSystemOptions,
+  cleanupOrders
 } from '@/api/system'
 import { Setting, Check, Plus, Delete, ArrowUp, ArrowDown, Sort } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
@@ -373,8 +443,26 @@ const activeTab = ref('fee')
 
 // ==================== 平台费率 ====================
 const saving = ref(false)
+const cleanupLoading = ref(false)
 const configForm = reactive({
-  platform_fee_rate: 0.2
+  platform_fee_rate: 0.2,
+  order_cleanup_days: 30,
+  order_cleanup_enabled: false,
+  clear_player_income: false
+})
+
+// 手动清理表单
+const manualCleanupForm = reactive({
+  cutoffDate: null,
+  cleanupCompleted: true,
+  cleanupCancelled: true,
+  clearPlayerIncome: false
+})
+
+// 是否可以手动清理
+const canManualCleanup = computed(() => {
+  return manualCleanupForm.cutoffDate && 
+         (manualCleanupForm.cleanupCompleted || manualCleanupForm.cleanupCancelled)
 })
 
 // ==================== 等级管理 ====================
@@ -461,6 +549,9 @@ const loadConfig = async () => {
   try {
     const res = await getSystemConfig()
     configForm.platform_fee_rate = res.data.platformFeeRate
+    configForm.order_cleanup_days = res.data.orderCleanupDays || 30
+    configForm.order_cleanup_enabled = res.data.orderCleanupEnabled || false
+    configForm.clear_player_income = res.data.clearPlayerIncome || false
   } catch (error) {
     ElMessage.error('加载配置失败')
   }
@@ -470,13 +561,59 @@ const saveConfig = async () => {
   saving.value = true
   try {
     await updateSystemConfig({
-      platformFeeRate: configForm.platform_fee_rate
+      platformFeeRate: configForm.platform_fee_rate,
+      orderCleanupDays: configForm.order_cleanup_days,
+      orderCleanupEnabled: configForm.order_cleanup_enabled,
+      clearPlayerIncome: configForm.clear_player_income
     })
     ElMessage.success('保存成功')
   } catch (error) {
     ElMessage.error('保存失败')
   } finally {
     saving.value = false
+  }
+}
+
+const handleManualCleanup = async () => {
+  try {
+    const formattedDate = dayjs(manualCleanupForm.cutoffDate).format('YYYY-MM-DD HH:mm')
+    const orderTypes = []
+    if (manualCleanupForm.cleanupCompleted) orderTypes.push('已完成')
+    if (manualCleanupForm.cleanupCancelled) orderTypes.push('已取消')
+    
+    const confirmMessage = manualCleanupForm.clearPlayerIncome
+      ? `确定要清理 ${formattedDate} 之前的${orderTypes.join('、')}订单，并清零所有陪玩师的累计收入吗？此操作不可恢复！`
+      : `确定要清理 ${formattedDate} 之前的${orderTypes.join('、')}订单吗？此操作不可恢复！`
+    
+    await ElMessageBox.confirm(
+      confirmMessage,
+      '确认清理',
+      {
+        confirmButtonText: '确定清理',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    cleanupLoading.value = true
+    const res = await cleanupOrders({
+      cutoffDate: manualCleanupForm.cutoffDate,
+      cleanupCompleted: manualCleanupForm.cleanupCompleted,
+      cleanupCancelled: manualCleanupForm.cleanupCancelled,
+      clearPlayerIncome: manualCleanupForm.clearPlayerIncome
+    })
+    const data = res.data
+    let message = `清理完成：订单 ${data.orderCount} 条，截图 ${data.screenshotCount || 0} 张，会话 ${data.sessionCount} 条，财务记录 ${data.financialCount} 条，操作日志 ${data.operationLogCount || 0} 条`
+    if (manualCleanupForm.clearPlayerIncome && data.clearedPlayerCount > 0) {
+      message += `，已清零 ${data.clearedPlayerCount} 位陪玩师的累计收入`
+    }
+    ElMessage.success(message)
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.message || '清理失败')
+    }
+  } finally {
+    cleanupLoading.value = false
   }
 }
 
@@ -835,6 +972,13 @@ onMounted(() => {
 .config-form {
   max-width: 500px;
   
+  .section-title {
+    margin: 0 0 20px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+  }
+  
   .unit-label {
     margin-left: 10px;
     font-size: 14px;
@@ -845,6 +989,10 @@ onMounted(() => {
     color: #909399;
     font-size: 13px;
     margin-top: 8px;
+    
+    &.danger {
+      color: #f56c6c;
+    }
   }
 }
 

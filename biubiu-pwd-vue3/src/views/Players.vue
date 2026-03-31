@@ -159,7 +159,7 @@
             </template>
           </el-table-column>
           <!-- 操作列 -->
-          <el-table-column label="操作" width="220" fixed="right">
+          <el-table-column label="操作" width="280" fixed="right">
             <template #default="{ row }">
               <div class="action-group" v-if="isAdmin">
                 <el-button
@@ -175,6 +175,9 @@
                 </el-button>
                 <el-button type="warning" size="small" @click="handleResetPassword(row)">
                   <el-icon><Key /></el-icon>重置密码
+                </el-button>
+                <el-button type="danger" size="small" @click="handleDelete(row)">
+                  <el-icon><Delete /></el-icon>删除
                 </el-button>
               </div>
               <span v-else-if="isCustomerService" class="no-action">-</span>
@@ -292,10 +295,10 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getPlayers, approvePlayer, updatePlayer, resetPassword } from '@/api/users'
+import { getPlayers, approvePlayer, updatePlayer, resetPassword, deletePlayer } from '@/api/users'
 import { getLevelPrices } from '@/api/system'
 import { useUserStore } from '@/stores/user'
-import { UserFilled, Search, Timer, CircleCheck, CircleClose, Check, Edit, Key, Grid } from '@element-plus/icons-vue'
+import { UserFilled, Search, Timer, CircleCheck, CircleClose, Check, Edit, Key, Grid, Delete } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -494,6 +497,27 @@ const submitResetPassword = async () => {
     resetPwdDialogVisible.value = false
   } catch (error) {
     ElMessage.error('密码重置失败')
+  }
+}
+
+const handleDelete = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除陪玩师 "${row.nickname}" 吗？此操作不可恢复！`,
+      '确认删除',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    await deletePlayer(row.id)
+    ElMessage.success('删除成功')
+    loadPlayers()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.message || '删除失败')
+    }
   }
 }
 

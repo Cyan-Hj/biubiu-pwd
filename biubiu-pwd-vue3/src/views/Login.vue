@@ -210,7 +210,6 @@ const handleLogin = async () => {
     ElMessage.success('登录成功')
     router.push('/')
   } catch (error) {
-    ElMessage.error(error.message || '登录失败')
   } finally {
     loading.value = false
   }
@@ -230,7 +229,6 @@ const handleRegister = async () => {
     ElMessage.success('注册成功，请等待管理员审核')
     activeTab.value = 'login'
   } catch (error) {
-    ElMessage.error(error.message || '注册失败')
   } finally {
     loading.value = false
   }

@@ -7,6 +7,7 @@ import com.biubiu.entity.SystemOption;
 import com.biubiu.repository.LevelPriceRepository;
 import com.biubiu.repository.SystemConfigRepository;
 import com.biubiu.repository.SystemOptionRepository;
+import com.biubiu.service.OrderCleanupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +24,7 @@ public class SystemController {
     private final SystemConfigRepository systemConfigRepository;
     private final LevelPriceRepository levelPriceRepository;
     private final SystemOptionRepository systemOptionRepository;
+    private final OrderCleanupService orderCleanupService;
 
     @GetMapping("/config")
     @PreAuthorize("hasAnyRole('ADMIN')")
@@ -46,8 +48,141 @@ public class SystemController {
             config.setPlatformFeeRate(request.getPlatformFeeRate());
         }
         
+        if (request.getOrderCleanupDays() != null) {
+            config.setOrderCleanupDays(request.getOrderCleanupDays());
+        }
+        
+        if (request.getOrderCleanupEnabled() != null) {
+            config.setOrderCleanupEnabled(request.getOrderCleanupEnabled());
+        }
+        
+        if (request.getClearPlayerIncome() != null) {
+            config.setClearPlayerIncome(request.getClearPlayerIncome());
+        }
+        
         systemConfigRepository.save(config);
         return ApiResponse.success("配置更新成功", null);
+    }
+
+    @PostMapping("/cleanup/orders")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<CleanupResultResponse> manualCleanupOrders(@RequestBody(required = false) CleanupRequestDTO request) {
+        OrderCleanupService.CleanupResult result;
+        
+        System.out.println("=== Cleanup Request ===");
+        System.out.println("Request: " + request);
+        if (request != null) {
+            System.out.println("CutoffDate String: " + request.getCutoffDate());
+            System.out.println("CutoffDateTime: " + request.getCutoffDateTime());
+            System.out.println("CleanupCompleted: " + request.isCleanupCompleted());
+            System.out.println("CleanupCancelled: " + request.isCleanupCancelled());
+            System.out.println("ClearPlayerIncome: " + request.isClearPlayerIncome());
+        }
+        
+        if (request != null && request.getCutoffDateTime() != null) {
+            // 使用高级清理 - 自定义参数
+            OrderCleanupService.CleanupRequest cleanupRequest = new OrderCleanupService.CleanupRequest();
+            cleanupRequest.setCutoffDate(request.getCutoffDateTime());
+            cleanupRequest.setCleanupCompleted(request.isCleanupCompleted());
+            cleanupRequest.setCleanupCancelled(request.isCleanupCancelled());
+            cleanupRequest.setClearPlayerIncome(request.isClearPlayerIncome());
+            result = orderCleanupService.manualCleanupAdvanced(cleanupRequest);
+        } else {
+            // 使用传统清理 - 依赖系统配置
+            System.out.println("Using traditional cleanup");
+            result = orderCleanupService.manualCleanup();
+        }
+        
+        CleanupResultResponse response = new CleanupResultResponse(
+            result.orderCount,
+            result.sessionCount,
+            result.financialCount,
+            result.operationLogCount,
+            result.screenshotCount,
+            result.clearedPlayerCount
+        );
+        return ApiResponse.success("清理完成", response);
+    }
+    
+    public static class CleanupRequestDTO {
+        private String cutoffDate;
+        private boolean cleanupCompleted = true;
+        private boolean cleanupCancelled = true;
+        private boolean clearPlayerIncome = false;
+        
+        public String getCutoffDate() {
+            return cutoffDate;
+        }
+        
+        public void setCutoffDate(String cutoffDate) {
+            this.cutoffDate = cutoffDate;
+        }
+        
+        public java.time.LocalDateTime getCutoffDateTime() {
+            if (cutoffDate == null || cutoffDate.isEmpty()) {
+                return null;
+            }
+            try {
+                // 支持格式: "YYYY-MM-DD" (日期) 或 "YYYY-MM-DD HH:mm:ss" (日期时间)
+                if (cutoffDate.length() == 10) {
+                    // 只有日期，转换为当天结束时间 23:59:59
+                    return java.time.LocalDate.parse(cutoffDate).atTime(23, 59, 59);
+                }
+                // 支持格式: "YYYY-MM-DD HH:mm:ss" 或 "YYYY-MM-DDTHH:mm:ss"
+                String normalized = cutoffDate.replace(" ", "T");
+                return java.time.LocalDateTime.parse(normalized);
+            } catch (Exception e) {
+                // 如果解析失败，尝试使用 DateTimeFormatter
+                try {
+                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                    return java.time.LocalDateTime.parse(cutoffDate, formatter);
+                } catch (Exception e2) {
+                    return null;
+                }
+            }
+        }
+        
+        public boolean isCleanupCompleted() {
+            return cleanupCompleted;
+        }
+        
+        public void setCleanupCompleted(boolean cleanupCompleted) {
+            this.cleanupCompleted = cleanupCompleted;
+        }
+        
+        public boolean isCleanupCancelled() {
+            return cleanupCancelled;
+        }
+        
+        public void setCleanupCancelled(boolean cleanupCancelled) {
+            this.cleanupCancelled = cleanupCancelled;
+        }
+        
+        public boolean isClearPlayerIncome() {
+            return clearPlayerIncome;
+        }
+        
+        public void setClearPlayerIncome(boolean clearPlayerIncome) {
+            this.clearPlayerIncome = clearPlayerIncome;
+        }
+    }
+    
+    public static class CleanupResultResponse {
+        public int orderCount;
+        public int sessionCount;
+        public int financialCount;
+        public int operationLogCount;
+        public int screenshotCount;
+        public int clearedPlayerCount;
+        
+        public CleanupResultResponse(int orderCount, int sessionCount, int financialCount, int operationLogCount, int screenshotCount, int clearedPlayerCount) {
+            this.orderCount = orderCount;
+            this.sessionCount = sessionCount;
+            this.financialCount = financialCount;
+            this.operationLogCount = operationLogCount;
+            this.screenshotCount = screenshotCount;
+            this.clearedPlayerCount = clearedPlayerCount;
+        }
     }
 
     @GetMapping("/levels")

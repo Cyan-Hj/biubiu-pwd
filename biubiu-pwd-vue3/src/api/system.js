@@ -61,3 +61,8 @@ export const deleteSystemOption = (id) => {
 export const sortSystemOptions = (data) => {
   return request.post('/system/options/sort', data)
 }
+
+// 手动清理过期订单
+export const cleanupOrders = (data) => {
+  return request.post('/system/cleanup/orders', data)
+}

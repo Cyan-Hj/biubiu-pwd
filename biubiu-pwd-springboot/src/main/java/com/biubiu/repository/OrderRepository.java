@@ -67,4 +67,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "FROM Order o WHERE o.status = :status AND o.createdAt >= :startTime " +
            "GROUP BY DATE(o.createdAt) ORDER BY DATE(o.createdAt) DESC")
     List<Object[]> findDailyIncomeStats(@Param("status") Order.Status status, @Param("startTime") LocalDateTime startTime);
+
+    List<Order> findByStatusAndCreatedAtBefore(Order.Status status, LocalDateTime createdAt);
 }

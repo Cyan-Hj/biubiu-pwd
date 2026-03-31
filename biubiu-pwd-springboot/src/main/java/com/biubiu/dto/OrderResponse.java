@@ -52,4 +52,8 @@ public class OrderResponse {
     
     // 陪玩师会话信息列表（用于详情页面显示每个人的完成时间）
     private List<PlayerSessionInfo> playerSessions;
+    
+    // 完成订单截图
+    private String startScreenshotUrl;
+    private String endScreenshotUrl;
 }
