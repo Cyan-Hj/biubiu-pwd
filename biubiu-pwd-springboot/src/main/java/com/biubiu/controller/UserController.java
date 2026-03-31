@@ -152,6 +152,22 @@ public class UserController {
         return ApiResponse.success("密码重置成功", null);
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> deletePlayer(@PathVariable Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+
+        // 检查是否有进行中的订单
+        long activeOrders = orderRepository.countByCurrentPlayerIdAndStatus(user.getId(), Order.Status.IN_SERVICE);
+        if (activeOrders > 0) {
+            throw new RuntimeException("该陪玩师有进行中的订单，无法删除");
+        }
+
+        userRepository.delete(user);
+        return ApiResponse.success("删除成功", null);
+    }
+
     @GetMapping("/players/levels")
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
     public ApiResponse<List<String>> getPlayerLevels() {

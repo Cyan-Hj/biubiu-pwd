@@ -62,8 +62,32 @@ public class Order {
     @JoinColumn(name = "assigned_by")
     private User assignedBy;
 
+    // 客户类型和老板关联
+    @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    private CustomerType customerType = CustomerType.SCATTER;
+
+    @ManyToOne
+    @JoinColumn(name = "boss_id")
+    private Boss boss;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal originalAmount;
+
+    @Column(precision = 3, scale = 2)
+    private BigDecimal discountRate;
+
+    private Boolean useBalance;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal balanceDeducted;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    public enum CustomerType {
+        SCATTER, REGULAR
+    }
 
     private LocalDateTime assignedAt;
     private LocalDateTime startedAt;
@@ -76,6 +100,13 @@ public class Order {
     private String cancelReason;
 
     private LocalDateTime cancelledAt;
+
+    // 完成订单截图
+    @Column(name = "start_screenshot_url", length = 500)
+    private String startScreenshotUrl;
+
+    @Column(name = "end_screenshot_url", length = 500)
+    private String endScreenshotUrl;
 
     public enum Status {
         PENDING_ASSIGN,    // 0: 待分配

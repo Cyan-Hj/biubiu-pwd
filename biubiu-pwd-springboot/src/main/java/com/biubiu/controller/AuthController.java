@@ -32,7 +32,7 @@ public class AuthController {
         );
 
         User user = userRepository.findByPhone(request.getPhone())
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+                .orElseThrow(() -> new RuntimeException("手机号或密码错误"));
 
         if (user.getStatus() == User.Status.pending) {
             throw new RuntimeException("账号待审核，请联系管理员");

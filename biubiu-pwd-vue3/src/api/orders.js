@@ -8,6 +8,10 @@ export const getOrderById = (id) => {
   return request.get(`/orders/${id}`)
 }
 
+export const getOrderByOrderNo = (orderNo) => {
+  return request.get(`/orders/by-order-no/${orderNo}`)
+}
+
 export const getMyInServiceOrders = () => {
   return request.get('/orders/my-in-service')
 }

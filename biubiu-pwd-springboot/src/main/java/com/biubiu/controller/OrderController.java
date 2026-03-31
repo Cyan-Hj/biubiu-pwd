@@ -120,6 +120,13 @@ public class OrderController {
         return ApiResponse.success(convertToResponse(order));
     }
 
+    @GetMapping("/by-order-no/{orderNo}")
+    public ApiResponse<OrderResponse> getOrderByOrderNo(@PathVariable String orderNo) {
+        Order order = orderRepository.findByOrderNo(orderNo)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        return ApiResponse.success(convertToResponse(order));
+    }
+
     @GetMapping("/my-in-service")
     @PreAuthorize("hasRole('PLAYER')")
     public ApiResponse<List<OrderResponse>> getMyInServiceOrders() {
@@ -189,6 +196,8 @@ public class OrderController {
                 .cancelReason(order.getCancelReason())
                 .cancelledAt(order.getCancelledAt())
                 .playerCount(order.getPlayerCount() != null ? order.getPlayerCount().name() : null)
+                .startScreenshotUrl(order.getStartScreenshotUrl())
+                .endScreenshotUrl(order.getEndScreenshotUrl())
                 .build();
         
         // 获取当前登录用户

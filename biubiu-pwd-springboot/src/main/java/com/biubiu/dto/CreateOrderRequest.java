@@ -31,4 +31,11 @@ public class CreateOrderRequest {
     private String remark;
     private String orderType;
     private String playerCount;
+
+    // 客户类型和老板信息
+    private String customerType;
+    private Long bossId;
+    private BigDecimal originalAmount;
+    private BigDecimal discountRate;
+    private Boolean useBalance;
 }

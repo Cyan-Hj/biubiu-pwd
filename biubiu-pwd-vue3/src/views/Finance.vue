@@ -148,98 +148,15 @@
       </el-card>
     </div>
 
-    <!-- 陪玩师视图 -->
-    <el-row :gutter="20" v-if="isPlayer" class="player-stats-row">
-      <el-col :xs="24" :sm="8">
-        <div class="stat-card primary">
-          <div class="stat-icon large"><el-icon><Wallet /></el-icon></div>
-          <div class="stat-content">
-            <div class="stat-label">累计收入</div>
-            <div class="stat-value large">¥{{ formatNumber(incomeData.totalIncome) }}</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :xs="24" :sm="8">
-        <div class="stat-card success">
-          <div class="stat-icon large"><el-icon><Money /></el-icon></div>
-          <div class="stat-content">
-            <div class="stat-label">可提现余额</div>
-            <div class="stat-value large">¥{{ formatNumber(incomeData.availableBalance) }}</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :xs="24" :sm="8">
-        <div class="stat-card info">
-          <div class="stat-icon large"><el-icon><TrendCharts /></el-icon></div>
-          <div class="stat-content">
-            <div class="stat-label">今日收入</div>
-            <div class="stat-value large">¥{{ formatNumber(incomeData.todayIncome) }}</div>
-          </div>
-        </div>
-      </el-col>
-    </el-row>
-
-    <!-- 陪玩师提现申请 -->
-    <el-card class="withdraw-card" v-if="isPlayer">
-      <template #header>
-        <div class="card-header">
-          <span><el-icon><CreditCard /></el-icon> 申请提现</span>
-        </div>
-      </template>
-      <el-form :model="withdrawForm" label-width="100px" class="withdraw-form">
-        <el-row :gutter="20">
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="提现金额">
-              <el-input-number 
-                v-model="withdrawForm.amount" 
-                :min="1" 
-                :max="incomeData.availableBalance || 0" 
-                :precision="2"
-                style="width: 100%"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="提现方式">
-              <el-select v-model="withdrawForm.paymentMethod" placeholder="选择提现方式" style="width: 100%">
-                <el-option label="支付宝" value="alipay">
-                  <el-icon><Wallet /></el-icon> 支付宝
-                </el-option>
-                <el-option label="微信" value="wechat">
-                  <el-icon><ChatDotRound /></el-icon> 微信
-                </el-option>
-                <el-option label="银行卡" value="bank">
-                  <el-icon><CreditCard /></el-icon> 银行卡
-                </el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="收款账号">
-              <el-input v-model="withdrawForm.accountInfo" placeholder="请输入收款账号" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="真实姓名">
-              <el-input v-model="withdrawForm.realName" placeholder="请输入真实姓名" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item>
-          <el-button 
-            type="primary" 
-            size="large"
-            @click="handleWithdraw" 
-            :disabled="!canWithdraw"
-            class="withdraw-btn"
-          >
-            <el-icon><Check /></el-icon> 申请提现
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+    <!-- 陪玩师视图 - 暂不开放 -->
+    <div v-if="isPlayer" class="not-available-page">
+      <el-empty description="暂不开放此页面">
+        <template #image>
+          <el-icon class="not-available-icon"><Lock /></el-icon>
+        </template>
+        <p class="not-available-text">财务管理功能正在开发中，敬请期待</p>
+      </el-empty>
+    </div>
 
     <!-- 收入明细 -->
     <el-card class="records-card">
@@ -315,7 +232,7 @@ import * as echarts from 'echarts'
 import { 
   Calendar, DataLine, Money, Coin, User, TrendCharts, 
   PieChart, Histogram, Trophy, Wallet, CreditCard, 
-  Check, List, ChatDotRound, CircleClose
+  Check, List, ChatDotRound, CircleClose, Lock
 } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
@@ -870,6 +787,12 @@ watch(() => adminStats.value, () => {
 .withdraw-form {
   padding: 10px 0;
   
+  .balance-tip {
+    font-size: 12px;
+    color: #f56c6c;
+    margin-top: 5px;
+  }
+  
   .withdraw-btn {
     padding: 12px 30px;
     font-size: 15px;
@@ -950,5 +873,29 @@ watch(() => adminStats.value, () => {
 .pagination {
   margin-top: 20px;
   justify-content: flex-end;
+}
+
+// 暂不开放页面样式
+.not-available-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+  
+  .not-available-icon {
+    font-size: 80px;
+    color: #c0c4cc;
+    margin-bottom: 20px;
+  }
+  
+  .not-available-text {
+    color: #909399;
+    font-size: 14px;
+    margin-top: 10px;
+  }
 }
 </style>

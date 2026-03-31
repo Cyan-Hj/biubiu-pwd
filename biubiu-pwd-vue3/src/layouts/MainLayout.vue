@@ -39,6 +39,11 @@
           <span>财务管理</span>
         </el-menu-item>
 
+        <el-menu-item v-if="isAdmin || isCustomerService" index="/boss" class="menu-item">
+          <el-icon><User /></el-icon>
+          <span>老板预存</span>
+        </el-menu-item>
+
         <el-menu-item v-if="isAdmin" index="/withdrawals" class="menu-item">
           <el-icon><Check /></el-icon>
           <span>提现审核</span>
@@ -102,6 +107,8 @@ import {
   HomeFilled, UserFilled, List, Money, Check, Setting, 
   ArrowDown, User, SwitchButton, Monitor 
 } from '@element-plus/icons-vue'
+
+// 导入 User 图标用于老板预存菜单
 
 const router = useRouter()
 const userStore = useUserStore()

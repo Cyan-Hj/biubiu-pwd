@@ -5,6 +5,12 @@ spring:
   application:
     name: biubiu-pwd-backend
   
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 20MB
+  
   datasource:
     url: jdbc:mysql://localhost:3306/biubiu_pwd?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
     username: root
@@ -24,6 +30,11 @@ spring:
 jwt:
   secret: biubiu-pwd-secret-key-2024-for-jwt-signing
   expiration: 86400000
+
+# 文件上传配置
+file:
+  upload:
+    path: uploads/
 
 # 日志配置
 logging:

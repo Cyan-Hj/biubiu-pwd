@@ -19,3 +19,7 @@ export const updatePlayer = (id, data) => {
 export const resetPassword = (id, data) => {
   return request.post(`/users/${id}/reset-password`, data)
 }
+
+export const deletePlayer = (id) => {
+  return request.delete(`/users/${id}`)
+}

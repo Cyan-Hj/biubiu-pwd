@@ -16,4 +16,6 @@ public interface OrderSessionRepository extends JpaRepository<OrderSession, Long
     List<OrderSession> findByOrderIdAndPlayerId(Long orderId, Long playerId);
     
     Optional<OrderSession> findByOrderIdAndPlayerIdAndEndedAtIsNull(Long orderId, Long playerId);
+    
+    int deleteByOrderId(Long orderId);
 }

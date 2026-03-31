@@ -11,4 +11,8 @@ public class CompleteOrderRequest {
     @NotNull(message = "实际时长不能为空")
     @DecimalMin(value = "0.5", message = "实际时长至少0.5小时")
     private BigDecimal actualHours;
+
+    // 完成订单截图
+    private String startScreenshotUrl;
+    private String endScreenshotUrl;
 }

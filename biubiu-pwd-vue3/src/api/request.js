@@ -36,6 +36,12 @@ request.interceptors.response.use(
       userStore.logout()
       window.location.href = '/login'
       ElMessage.error('登录已过期，请重新登录')
+    } else if (response?.data?.message) {
+      ElMessage.error(response.data.message)
+    } else if (!response || error.code === 'ECONNABORTED') {
+      ElMessage.error('网络连接失败，请检查网络设置')
+    } else if (response?.status >= 500) {
+      ElMessage.error('服务器错误，请稍后重试')
     } else {
       ElMessage.error(error.message || '网络错误')
     }
