@@ -1,0 +1,55 @@
+# 默认忽略的文件
+/shelf/
+/workspace.xml
+# 基于编辑器的 HTTP 客户端请求
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# IDEA 专属配置
+.idea/
+*.iml
+*.iws
+*.ipr
+misc.xml
+modules.xml
+vcs.xml
+# 编译/日志文件
+target/
+logs/
+# 前端依赖
+node_modules/
+# 本地环境配置
+application-local.yml
+.env
+# 临时文件
+*.log
+*.tmp
+
+# 1. 递归忽略【所有文件夹】里的 .idea 和 iml
+# 不管你打开根目录/后端子目录，生成多少都自动屏蔽
+**/.idea/
+**/*.iml
+
+# 2. Windows 系统专属垃圾文件（必须加）
+Thumbs.db
+Desktop.ini
+*.bak
+
+# 3. 前端补充（打包产物+缓存）
+dist/
+build/
+.env.local
+.env.development
+npm-debug.log*
+yarn-error.log*
+
+# 4. 后端补充（上传文件+打包文件）
+uploads/
+*.jar
+*.war
+
+# 5. 其他冗余文件
+*.zip
+*.rar
+*.sql
