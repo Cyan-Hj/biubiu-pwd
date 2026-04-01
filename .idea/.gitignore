@@ -1,0 +1,27 @@
+# 默认忽略的文件
+/shelf/
+/workspace.xml
+# 基于编辑器的 HTTP 客户端请求
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# IDEA 专属配置
+.idea/
+*.iml
+*.iws
+*.ipr
+misc.xml
+modules.xml
+vcs.xml
+# 编译/日志文件
+target/
+logs/
+# 前端依赖
+node_modules/
+# 本地环境配置
+application-local.yml
+.env
+# 临时文件
+*.log
+*.tmp
