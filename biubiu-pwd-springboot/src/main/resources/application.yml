@@ -3,7 +3,7 @@ server:
 
 spring:
   profiles:
-    active: default
+    active: local
 
   application:
     name: biubiu-pwd-springboot
