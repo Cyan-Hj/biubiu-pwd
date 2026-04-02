@@ -7,9 +7,9 @@ export const useUserStore = defineStore('user', () => {
   const userInfo = ref(JSON.parse(sessionStorage.getItem('userInfo') || '{}'))
 
   const isLoggedIn = computed(() => !!token.value)
-  const isAdmin = computed(() => userInfo.value?.role === 'admin')
-  const isCustomerService = computed(() => userInfo.value?.role === 'customer_service')
-  const isPlayer = computed(() => userInfo.value?.role === 'player')
+  const isAdmin = computed(() => userInfo.value?.role === 'ADMIN')
+  const isCustomerService = computed(() => userInfo.value?.role === 'CUSTOMER_SERVICE')
+  const isPlayer = computed(() => userInfo.value?.role === 'PLAYER')
 
   const setToken = (newToken) => {
     token.value = newToken

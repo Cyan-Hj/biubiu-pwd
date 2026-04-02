@@ -99,9 +99,9 @@ public class FinanceController {
                 .collect(Collectors.toList());
 
         // 陪玩师统计
-        Long totalPlayerCount = userRepository.countByRole(User.Role.player);
-        Long pendingPlayerCount = userRepository.countByRoleAndStatus(User.Role.player, User.Status.pending);
-        Long activePlayerCount = userRepository.countByRoleAndStatus(User.Role.player, User.Status.active);
+        Long totalPlayerCount = userRepository.countByRole(User.Role.PLAYER);
+        Long pendingPlayerCount = userRepository.countByRoleAndStatus(User.Role.PLAYER, User.Status.pending);
+        Long activePlayerCount = userRepository.countByRoleAndStatus(User.Role.PLAYER, User.Status.active);
 
         // 待处理事项统计
         Long pendingWithdrawals = withdrawalRequestRepository.countByStatus(WithdrawalRequest.Status.pending);
@@ -161,7 +161,7 @@ public class FinanceController {
         User currentUser = getCurrentUser();
 
         Page<FinancialRecord> recordPage;
-        if (currentUser.getRole() == User.Role.admin) {
+        if (currentUser.getRole() == User.Role.ADMIN) {
             recordPage = financialRecordRepository.findAll(
                 PageRequest.of(page - 1, pageSize, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))
             );

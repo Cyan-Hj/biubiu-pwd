@@ -76,7 +76,7 @@ public class AuthController {
         user.setPhone(request.getPhone());
         user.setNickname(request.getNickname());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(User.Role.player);
+        user.setRole(User.Role.PLAYER);
         user.setStatus(User.Status.pending);
 
         userRepository.save(user);

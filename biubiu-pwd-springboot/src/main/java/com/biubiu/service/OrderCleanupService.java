@@ -129,7 +129,7 @@ public class OrderCleanupService {
     }
     
     private int clearAllPlayersIncome() {
-        List<User> players = userRepository.findByRole(User.Role.player);
+        List<User> players = userRepository.findByRole(User.Role.PLAYER);
         int count = 0;
         for (User player : players) {
             if (player.getTotalIncome() != null && player.getTotalIncome().compareTo(BigDecimal.ZERO) > 0) {

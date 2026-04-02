@@ -56,7 +56,7 @@ public class OrderController {
         Long playerId = null;
         Boolean excludeCancelled = null;
         Order.Status cancelledStatus = null;
-        if (currentUser.getRole() == User.Role.player) {
+        if (currentUser.getRole() == User.Role.PLAYER) {
             playerId = currentUser.getId();
             excludeCancelled = true; // 陪玩师看不到取消的订单
             cancelledStatus = Order.Status.CANCELLED;
@@ -207,7 +207,7 @@ public class OrderController {
         boolean isPlayer1 = order.getCurrentPlayer() != null && order.getCurrentPlayer().getId().equals(currentUser.getId());
         boolean isPlayer2 = order.getCurrentPlayer2() != null && order.getCurrentPlayer2().getId().equals(currentUser.getId());
         
-        if (currentUser.getRole() == User.Role.player && (isPlayer1 || isPlayer2)) {
+        if (currentUser.getRole() == User.Role.PLAYER && (isPlayer1 || isPlayer2)) {
             // 检查当前用户是否已经接单（存在未结束的会话）
             List<com.biubiu.entity.OrderSession> sessions = orderSessionRepository.findByOrderIdAndPlayerId(order.getId(), currentUser.getId());
             boolean hasActiveSession = sessions.stream().anyMatch(s -> s.getEndedAt() == null);

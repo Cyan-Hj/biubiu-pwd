@@ -30,7 +30,7 @@ public class User {
 
     @Column(length = 20)
     @Enumerated(EnumType.STRING)
-    private Role role = Role.player;
+    private Role role = Role.PLAYER;
 
     @Column(length = 20)
     private String level = "青铜";
@@ -55,7 +55,7 @@ public class User {
     private LocalDateTime updatedAt;
 
     public enum Role {
-        player, customer_service, admin
+        PLAYER, CUSTOMER_SERVICE, ADMIN
     }
 
     public enum Status {

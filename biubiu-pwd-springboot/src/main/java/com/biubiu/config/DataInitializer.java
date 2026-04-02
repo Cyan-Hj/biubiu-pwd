@@ -28,16 +28,16 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void initAdminUser() {
-        Optional<User> existing = userRepository.findByPhone("13800000000");
+        Optional<User> existing = userRepository.findByPhone("18191102965");
         if (existing.isEmpty()) {
             User admin = new User();
-            admin.setPhone("13800000000");
-            admin.setPassword(passwordEncoder.encode("admin123"));
+            admin.setPhone("18191102965");
+            admin.setPassword(passwordEncoder.encode("rr031108"));
             admin.setNickname("系统管理员");
-            admin.setRole(User.Role.admin);
+            admin.setRole(User.Role.ADMIN);
             admin.setStatus(User.Status.active);
             userRepository.save(admin);
-            System.out.println("初始化管理员账号: 13800000000 / admin123");
+            System.out.println("初始化管理员账号: 18191102965 / rr031108");
         }
     }
 
@@ -48,7 +48,7 @@ public class DataInitializer implements CommandLineRunner {
             service.setPhone("13800000001");
             service.setPassword(passwordEncoder.encode("service123"));
             service.setNickname("客服01");
-            service.setRole(User.Role.customer_service);
+            service.setRole(User.Role.CUSTOMER_SERVICE);
             service.setStatus(User.Status.active);
             userRepository.save(service);
             System.out.println("初始化客服账号: 13800000001 / service123");

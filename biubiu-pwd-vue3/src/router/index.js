@@ -23,7 +23,7 @@ const routes = [
         path: 'players',
         name: 'Players',
         component: () => import('@/views/Players.vue'),
-        meta: { roles: ['admin', 'customer_service'] }
+        meta: { roles: ['ADMIN', 'CUSTOMER_SERVICE'] }
       },
       {
         path: 'orders',
@@ -39,19 +39,19 @@ const routes = [
         path: 'withdrawals',
         name: 'Withdrawals',
         component: () => import('@/views/Withdrawals.vue'),
-        meta: { roles: ['admin'] }
+        meta: { roles: ['ADMIN'] }
       },
       {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/Settings.vue'),
-        meta: { roles: ['admin'] }
+        meta: { roles: ['ADMIN'] }
       },
       {
         path: 'boss',
         name: 'Boss',
         component: () => import('@/views/Boss.vue'),
-        meta: { roles: ['admin', 'customer_service'] }
+        meta: { roles: ['ADMIN', 'CUSTOMER_SERVICE'] }
       }
     ]
   }
