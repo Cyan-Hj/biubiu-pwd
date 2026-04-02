@@ -1,0 +1,47 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: biubiu-pwd-backend
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/biubiu_pwd?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:Root@123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: false
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET:biubiu-pwd-secret-key-2024-for-jwt-signing}
+  expiration: 86400000
+
+# 文件上传配置
+file:
+  upload:
+    path: ${UPLOAD_PATH:/var/www/biubiu/uploads/}
+
+# 日志配置
+logging:
+  level:
+    com.biubiu: INFO
+    org.springframework.security: INFO
+  file:
+    name: ${LOG_PATH:/var/log/biubiu/biubiu-pwd.log}
+    max-size: 100MB
+    max-history: 30
