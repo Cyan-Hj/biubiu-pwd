@@ -1,56 +1,157 @@
-# 默认忽略的文件
-/shelf/
-/workspace.xml
-# 基于编辑器的 HTTP 客户端请求
-/httpRequests/
-# Datasource local storage ignored files
-/dataSources/
-/dataSources.local.xml
-# IDEA 专属配置
+# ============================================
+# IDE 配置文件
+# ============================================
+# IntelliJ IDEA
 .idea/
 *.iml
 *.iws
 *.ipr
+**/.idea/
+**/*.iml
 misc.xml
 modules.xml
 vcs.xml
-# 编译/日志文件
+/shelf/
+/workspace.xml
+/httpRequests/
+/dataSources/
+/dataSources.local.xml
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# ============================================
+# 编译输出文件
+# ==========================================
 target/
-logs/
-# 前端依赖
-node_modules/
-# 本地环境配置（只忽略本地配置，保留主配置）
-application-local.yml
-application-dev.yml
-.env
-# 临时文件
-*.log
-*.tmp
-
-# 1. 递归忽略【所有文件夹】里的 .idea 和 iml
-# 不管你打开根目录/后端子目录，生成多少都自动屏蔽
-**/.idea/
-**/*.iml
-
-# 2. Windows 系统专属垃圾文件（必须加）
-Thumbs.db
-Desktop.ini
-*.bak
-
-# 3. 前端补充（打包产物+缓存）
-dist/
 build/
-.env.local
-.env.development
+bin/
+out/
+dist/
+*.class
+
+# ============================================
+# 依赖目录
+# ============================================
+node_modules/
+.mvn/
+
+# ============================================
+# 日志文件
+# ============================================
+logs/
+*.log
 npm-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# 4. 后端补充（上传文件+打包文件）
+# ============================================
+# 临时文件
+# ============================================
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+
+# ============================================
+# 操作系统文件
+# ============================================
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Linux
+*~
+.nfs*
+
+# ============================================
+# 敏感配置文件（重要！）
+# ============================================
+# 本地环境配置（包含数据库密码等敏感信息）
+application-local.yml
+application-dev.yml
+application-local.properties
+application-dev.properties
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# ============================================
+# 用户上传文件（可能包含敏感数据）
+# ============================================
 uploads/
+**/uploads/
+!uploads/.gitkeep
+
+# ============================================
+# 打包文件
+# ============================================
 *.jar
 *.war
-
-# 5. 其他冗余文件
+*.ear
 *.zip
 *.rar
+*.7z
+*.tar
+*.gz
+
+# ============================================
+# 数据库文件
+# ============================================
 *.sql
+*.sqlite
+*.sqlite3
+*.db
+
+# ============================================
+# 测试文件
+# ============================================
+test_*.js
+test_*.java
+test_*.py
+
+# ============================================
+# 其他
+# ============================================
+*.bak
+*.orig
