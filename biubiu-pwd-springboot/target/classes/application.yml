@@ -39,6 +39,7 @@ file:
   upload:
     path: uploads/
 
+
 # 日志配置
 logging:
   level:

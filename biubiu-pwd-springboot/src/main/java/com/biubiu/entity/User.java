@@ -16,6 +16,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true, length = 20)
+    private String playerNo;
+
     @Column(unique = true, nullable = false, length = 11)
     private String phone;
 
@@ -47,6 +50,9 @@ public class User {
 
     @Column(precision = 10, scale = 2)
     private BigDecimal availableBalance = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private Boolean enabled = true;
 
     @CreationTimestamp
     private LocalDateTime createdAt;

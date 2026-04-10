@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 @Builder
 public class PlayerResponse {
     private Long id;
+    private String playerNo;
     private String nickname;
     private String phone;
     private String level;

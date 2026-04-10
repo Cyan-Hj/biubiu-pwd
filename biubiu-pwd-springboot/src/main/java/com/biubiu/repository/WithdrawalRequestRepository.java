@@ -18,4 +18,6 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
     List<WithdrawalRequest> findByPlayerId(@Param("playerId") Long playerId);
 
     long countByStatus(WithdrawalRequest.Status status);
+
+    long countByPlayerId(Long playerId);
 }

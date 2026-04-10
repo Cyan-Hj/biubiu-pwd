@@ -6,10 +6,14 @@ import com.biubiu.dto.CreateOrderRequest;
 import com.biubiu.entity.*;
 import com.biubiu.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -19,6 +23,9 @@ import java.util.Random;
 @RequiredArgsConstructor
 public class OrderService {
 
+    @Value("${file.upload.path:uploads/}")
+    private String uploadPath;
+
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final SystemConfigRepository systemConfigRepository;
@@ -27,6 +34,7 @@ public class OrderService {
     private final OperationLogRepository operationLogRepository;
     private final BossRepository bossRepository;
     private final OrderBalanceService orderBalanceService;
+    private final BossRechargeRecordRepository rechargeRecordRepository;
 
     @Transactional
     public Order createOrder(CreateOrderRequest request, User currentUser) {
@@ -49,6 +57,8 @@ public class OrderService {
             order.setPlayerCount(Order.PlayerCount.SINGLE);
         }
 
+        order.setOrderType(request.getOrderType());
+
         // 设置客户类型和老板信息
         if (request.getCustomerType() != null) {
             order.setCustomerType(Order.CustomerType.valueOf(request.getCustomerType()));
@@ -56,7 +66,6 @@ public class OrderService {
             order.setCustomerType(Order.CustomerType.SCATTER);
         }
 
-        BigDecimal shortfall = BigDecimal.ZERO;
         if (request.getBossId() != null && order.getCustomerType() == Order.CustomerType.REGULAR) {
             Boss boss = bossRepository.findById(request.getBossId())
                     .orElseThrow(() -> new RuntimeException("老板不存在"));
@@ -67,24 +76,13 @@ public class OrderService {
 
             // 如果使用余额支付，扣减余额
             if (Boolean.TRUE.equals(request.getUseBalance())) {
-                shortfall = orderBalanceService.deductBalance(order, boss, request.getTotalAmount());
+                orderBalanceService.deductBalance(order, boss, request.getTotalAmount());
             }
         }
 
         Order saved = orderRepository.save(order);
         
-        // 如果有差价，添加到备注
-        String remark = "创建订单";
-        if (shortfall.compareTo(BigDecimal.ZERO) > 0) {
-            remark += "，预存余额不足，需补差价：¥" + shortfall;
-            // 更新订单备注
-            String originalRemark = saved.getRemark();
-            String balanceRemark = "【余额不足】需补差价：¥" + shortfall;
-            saved.setRemark((originalRemark != null ? originalRemark + "\n" : "") + balanceRemark);
-            orderRepository.save(saved);
-        }
-        
-        logOperation(saved, currentUser, "CREATE", null, Order.Status.PENDING_ASSIGN, remark);
+        logOperation(saved, currentUser, "CREATE", null, Order.Status.PENDING_ASSIGN, "创建订单");
         return saved;
     }
 
@@ -263,6 +261,25 @@ public class OrderService {
         order.setStatus(Order.Status.CANCELLED);
         order.setCancelReason(reason);
         order.setCancelledAt(LocalDateTime.now());
+
+        // 如果订单使用了余额支付，退还扣除的余额
+        if (order.getBoss() != null && order.getBalanceDeducted() != null && order.getBalanceDeducted().compareTo(BigDecimal.ZERO) > 0) {
+            Boss boss = order.getBoss();
+            BigDecimal refundAmount = order.getBalanceDeducted();
+            boss.setBalance(boss.getBalance().add(refundAmount));
+            bossRepository.save(boss);
+
+            com.biubiu.entity.BossRechargeRecord refundRecord = new com.biubiu.entity.BossRechargeRecord();
+            refundRecord.setBossId(boss.getId());
+            refundRecord.setAmount(refundAmount);
+            refundRecord.setType(com.biubiu.entity.BossRechargeRecord.Type.REFUND);
+            refundRecord.setOrderNo(order.getOrderNo());
+            refundRecord.setRemark("取消订单，退还余额¥" + refundAmount);
+            refundRecord.setOperatorId(currentUser.getId());
+            rechargeRecordRepository.save(refundRecord);
+
+            order.setBalanceDeducted(BigDecimal.ZERO);
+        }
 
         orderRepository.save(order);
         logOperation(order, currentUser, "CANCEL", oldStatus, Order.Status.CANCELLED, "取消订单，原因: " + reason);
@@ -462,7 +479,7 @@ public class OrderService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             // 如果没有会话记录（兼容旧数据），使用请求中的时长
-            if (totalActualHours.compareTo(BigDecimal.ZERO) == 0) {
+            if (totalActualHours.compareTo(BigDecimal.ZERO) == 0 && request.getActualHours() != null) {
                 totalActualHours = request.getActualHours();
             }
             order.setActualHours(totalActualHours);
@@ -475,10 +492,31 @@ public class OrderService {
                 order.setEndScreenshotUrl(request.getEndScreenshotUrl());
             }
 
-            // 获取当前订单的总金额（不可变）
-            BigDecimal totalAmount = order.getTotalAmount();
-            if (totalAmount == null) {
-                totalAmount = order.getPricePerHour().multiply(order.getServiceHours());
+            // 计算订单实际金额
+            BigDecimal actualTotalAmount;
+            if ("huhang".equals(order.getOrderType())) {
+                actualTotalAmount = order.getTotalAmount();
+            } else {
+                BigDecimal pricePerHour = order.getPricePerHour();
+                BigDecimal createdHours = order.getServiceHours();
+                
+                if (totalActualHours.compareTo(createdHours) > 0) {
+                    BigDecimal extraMinutes = totalActualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
+                    int totalExtraMinutes = extraMinutes.intValue();
+                    int fullHours = totalExtraMinutes / 60;
+                    int remainingMinutes = totalExtraMinutes % 60;
+                    
+                    BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(pricePerHour);
+                    if (remainingMinutes > 15 && remainingMinutes <= 45) {
+                        extraFee = extraFee.add(pricePerHour.multiply(BigDecimal.valueOf(0.5)));
+                    } else if (remainingMinutes > 45) {
+                        extraFee = extraFee.add(pricePerHour);
+                    }
+                    
+                    actualTotalAmount = createdHours.multiply(pricePerHour).add(extraFee);
+                } else {
+                    actualTotalAmount = createdHours.multiply(pricePerHour);
+                }
             }
 
             // 获取平台抽成比例
@@ -486,8 +524,8 @@ public class OrderService {
                     .map(SystemConfig::getPlatformFeeRate)
                     .orElse(BigDecimal.valueOf(0.2));
 
-            // 计算所有陪玩师的总可分配收入 = 总金额 * (1 - 抽成比例)
-            BigDecimal totalPlayerIncome = totalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+            // 计算所有陪玩师的总可分配收入 = 实际金额 * (1 - 抽成比例)
+            BigDecimal totalPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
 
             // 双人订单：对半分
             if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
@@ -538,6 +576,13 @@ public class OrderService {
                 }
             }
 
+            // 更新老板的累计消费（按实际金额计算）
+            if (order.getBoss() != null) {
+                Boss boss = order.getBoss();
+                boss.setTotalConsumption(boss.getTotalConsumption().add(actualTotalAmount));
+                bossRepository.save(boss);
+            }
+
             orderRepository.save(order);
             logOperation(order, currentUser, "COMPLETE", oldStatus, Order.Status.COMPLETED, "完成订单（所有陪玩师已完成）");
         } else {
@@ -552,20 +597,30 @@ public class OrderService {
         for (Long id : ids) {
             Order order = orderRepository.findById(id).orElse(null);
             if (order != null) {
-                // 先删除关联的操作日志
                 List<OperationLog> logs = operationLogRepository.findByOrderIdOrderByCreatedAtDesc(id);
                 operationLogRepository.deleteAll(logs);
                 
-                // 删除关联的会话记录
                 List<OrderSession> sessions = orderSessionRepository.findByOrderId(id);
                 orderSessionRepository.deleteAll(sessions);
                 
-                // 删除关联的财务记录
                 List<FinancialRecord> records = financialRecordRepository.findByOrderId(id);
                 financialRecordRepository.deleteAll(records);
                 
-                // 删除订单
+                deleteScreenshotFile(order.getStartScreenshotUrl());
+                deleteScreenshotFile(order.getEndScreenshotUrl());
+                
                 orderRepository.delete(order);
+            }
+        }
+    }
+
+    private void deleteScreenshotFile(String screenshotUrl) {
+        if (screenshotUrl != null && !screenshotUrl.isEmpty()) {
+            try {
+                String filename = screenshotUrl.replace("/uploads/", "");
+                Path filePath = Paths.get(uploadPath).resolve(filename);
+                Files.deleteIfExists(filePath);
+            } catch (Exception ignored) {
             }
         }
     }
@@ -579,6 +634,156 @@ public class OrderService {
         log.setNewStatus(newStatus);
         log.setDetails(details);
         operationLogRepository.save(log);
+    }
+
+    @Transactional
+    public void pauseOrder(Long id, String reason, User currentUser) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        Order.Status oldStatus = order.getStatus();
+
+        boolean isAdminOrCS = currentUser.getRole() == User.Role.ADMIN || currentUser.getRole() == User.Role.CUSTOMER_SERVICE;
+        boolean isPlayer = currentUser.getRole() == User.Role.PLAYER;
+
+        if (isAdminOrCS) {
+            if (order.getStatus() != Order.Status.PENDING_ASSIGN && order.getStatus() != Order.Status.IN_SERVICE) {
+                throw new RuntimeException("管理员/客服只能在待分配或服务中状态下暂存订单");
+            }
+        } else if (isPlayer) {
+            if (order.getStatus() != Order.Status.PENDING_ACCEPT
+                    && order.getStatus() != Order.Status.PENDING_ACCEPT_2
+                    && order.getStatus() != Order.Status.IN_SERVICE) {
+                throw new RuntimeException("陪玩师只能在已接单或服务中状态下暂存订单");
+            }
+            boolean isPlayer1 = order.getCurrentPlayer() != null && order.getCurrentPlayer().getId().equals(currentUser.getId());
+            boolean isPlayer2 = order.getCurrentPlayer2() != null && order.getCurrentPlayer2().getId().equals(currentUser.getId());
+            if (!isPlayer1 && !isPlayer2) {
+                throw new RuntimeException("无权操作此订单");
+            }
+            if (order.getStatus() == Order.Status.PENDING_ACCEPT || order.getStatus() == Order.Status.PENDING_ACCEPT_2) {
+                List<OrderSession> sessions = orderSessionRepository.findByOrderIdAndPlayerId(order.getId(), currentUser.getId());
+                boolean hasActiveSession = sessions.stream().anyMatch(s -> s.getEndedAt() == null);
+                if (!hasActiveSession) {
+                    throw new RuntimeException("您尚未接单，无法暂存");
+                }
+            }
+        } else {
+            throw new RuntimeException("无权操作此订单");
+        }
+
+        if (order.getStatus() == Order.Status.IN_SERVICE) {
+            endCurrentSession(order);
+        }
+
+        order.setStatusBeforePause(oldStatus);
+        order.setStatus(Order.Status.PAUSED);
+        order.setPauseReason(reason);
+        order.setPausedAt(LocalDateTime.now());
+
+        orderRepository.save(order);
+        logOperation(order, currentUser, "PAUSE", oldStatus, Order.Status.PAUSED, "暂存订单，原因: " + reason);
+    }
+
+    @Transactional
+    public void resumeOrder(Long id, User currentUser) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (order.getStatus() != Order.Status.PAUSED) {
+            throw new RuntimeException("订单不是暂存状态，无法恢复");
+        }
+
+        Order.Status oldStatus = order.getStatus();
+        Order.Status targetStatus = order.getStatusBeforePause();
+        if (targetStatus == null) {
+            targetStatus = Order.Status.PENDING_ASSIGN;
+        }
+
+        order.setStatus(targetStatus);
+        order.setResumedAt(LocalDateTime.now());
+
+        if (targetStatus == Order.Status.IN_SERVICE) {
+            if (order.getCurrentPlayer() != null) {
+                OrderSession session = new OrderSession();
+                session.setOrder(order);
+                session.setPlayer(order.getCurrentPlayer());
+                session.setStartedAt(LocalDateTime.now());
+                orderSessionRepository.save(session);
+            }
+            if (order.getCurrentPlayer2() != null) {
+                OrderSession session2 = new OrderSession();
+                session2.setOrder(order);
+                session2.setPlayer(order.getCurrentPlayer2());
+                session2.setStartedAt(LocalDateTime.now());
+                orderSessionRepository.save(session2);
+            }
+        }
+
+        orderRepository.save(order);
+        logOperation(order, currentUser, "RESUME", oldStatus, targetStatus, "恢复订单到: " + targetStatus.name());
+    }
+
+    @Transactional
+    public Order updateOrder(Long id, com.biubiu.dto.UpdateOrderRequest request, User currentUser) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (order.getStatus() == Order.Status.CANCELLED) {
+            throw new RuntimeException("已取消的订单无法修改");
+        }
+
+        BigDecimal oldTotalAmount = order.getTotalAmount();
+        BigDecimal oldBalanceDeducted = order.getBalanceDeducted();
+        Boss oldBoss = order.getBoss();
+
+        order.setBossInfo(request.getBossInfo());
+        order.setServiceContent(request.getServiceContent());
+        order.setServiceHours(request.getServiceHours());
+        order.setPricePerHour(request.getPricePerHour());
+        order.setTotalAmount(request.getTotalAmount());
+        order.setScheduledTime(request.getScheduledTime());
+        order.setRemark(request.getRemark());
+        order.setOriginalAmount(request.getOriginalAmount());
+        order.setDiscountRate(request.getDiscountRate());
+
+        if (request.getBossId() != null) {
+            Boss newBoss = bossRepository.findById(request.getBossId())
+                    .orElseThrow(() -> new RuntimeException("老板不存在"));
+            order.setBoss(newBoss);
+            order.setCustomerType(Order.CustomerType.REGULAR);
+        } else {
+            order.setBoss(null);
+            order.setCustomerType(Order.CustomerType.SCATTER);
+        }
+
+        boolean useBalance = Boolean.TRUE.equals(request.getUseBalance());
+        order.setUseBalance(useBalance);
+
+        if (oldBoss != null && oldBalanceDeducted != null && oldBalanceDeducted.compareTo(BigDecimal.ZERO) > 0) {
+            oldBoss.setBalance(oldBoss.getBalance().add(oldBalanceDeducted));
+            bossRepository.save(oldBoss);
+
+            com.biubiu.entity.BossRechargeRecord refundRecord = new com.biubiu.entity.BossRechargeRecord();
+            refundRecord.setBossId(oldBoss.getId());
+            refundRecord.setAmount(oldBalanceDeducted);
+            refundRecord.setType(com.biubiu.entity.BossRechargeRecord.Type.REFUND);
+            refundRecord.setOrderNo(order.getOrderNo());
+            refundRecord.setRemark("修改订单，退还原扣款¥" + oldBalanceDeducted);
+            refundRecord.setOperatorId(currentUser.getId());
+            rechargeRecordRepository.save(refundRecord);
+        }
+
+        order.setBalanceDeducted(null);
+
+        if (useBalance && order.getBoss() != null) {
+            orderBalanceService.deductBalance(order, order.getBoss(), request.getTotalAmount());
+        }
+
+        Order saved = orderRepository.save(order);
+
+        logOperation(saved, currentUser, "UPDATE", order.getStatus(), order.getStatus(), "修改订单");
+        return saved;
     }
 
     private String generateOrderNo() {

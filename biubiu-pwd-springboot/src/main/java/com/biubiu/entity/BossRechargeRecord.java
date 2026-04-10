@@ -38,6 +38,6 @@ public class BossRechargeRecord {
     private LocalDateTime createdAt;
 
     public enum Type {
-        RECHARGE, DEDUCT
+        RECHARGE, DEDUCT, REFUND
     }
 }

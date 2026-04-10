@@ -38,21 +38,19 @@ public class OrderBalanceService {
         }
 
         if (deductAmount.compareTo(BigDecimal.ZERO) > 0) {
-            // 扣减余额
             boss.setBalance(balance.subtract(deductAmount));
-            boss.setTotalConsumption(boss.getTotalConsumption().add(deductAmount));
-            bossRepository.save(boss);
 
-            // 记录扣减
             BossRechargeRecord record = new BossRechargeRecord();
             record.setBossId(boss.getId());
             record.setAmount(deductAmount.negate());
             record.setType(BossRechargeRecord.Type.DEDUCT);
             record.setOrderNo(order.getOrderNo());
-            record.setRemark("订单消费" + (shortfall.compareTo(BigDecimal.ZERO) > 0 ? "，余额不足需补差价¥" + shortfall : ""));
+            record.setRemark("订单消费");
             record.setOperatorId(order.getCreatedBy().getId());
             rechargeRecordRepository.save(record);
         }
+
+        bossRepository.save(boss);
 
         // 更新订单
         order.setBalanceDeducted(deductAmount);

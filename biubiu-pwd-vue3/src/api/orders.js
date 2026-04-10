@@ -20,6 +20,10 @@ export const createOrder = (data) => {
   return request.post('/orders', data)
 }
 
+export const updateOrder = (id, data) => {
+  return request.put(`/orders/${id}`, data)
+}
+
 export const assignOrder = (id, data) => {
   return request.post(`/orders/${id}/assign`, data)
 }
@@ -38,6 +42,14 @@ export const completeOrder = (id, data) => {
 
 export const cancelOrder = (id, data) => {
   return request.post(`/orders/${id}/cancel`, data)
+}
+
+export const pauseOrder = (id, data) => {
+  return request.post(`/orders/${id}/pause`, data)
+}
+
+export const resumeOrder = (id) => {
+  return request.post(`/orders/${id}/resume`)
 }
 
 export const batchDeleteOrders = (ids) => {

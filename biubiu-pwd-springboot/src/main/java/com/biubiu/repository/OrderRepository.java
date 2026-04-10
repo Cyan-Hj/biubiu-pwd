@@ -32,6 +32,27 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                           @Param("cancelledStatus") Order.Status cancelledStatus,
                           Pageable pageable);
 
+    @Query("SELECT o FROM Order o WHERE " +
+           "(:keyword IS NULL OR LOWER(o.orderNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(o.bossInfo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(o.serviceContent) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "(o.boss IS NOT NULL AND LOWER(o.boss.name) LIKE LOWER(CONCAT('%', :keyword, '%')))) AND " +
+           "(:status IS NULL OR o.status = :status) AND " +
+           "(:playerId IS NULL OR o.currentPlayer.id = :playerId OR o.currentPlayer2.id = :playerId) AND " +
+           "(:today IS NULL OR :today = false OR DATE(o.createdAt) = CURRENT_DATE) AND " +
+           "(:startDate IS NULL OR DATE(o.createdAt) >= :startDate) AND " +
+           "(:endDate IS NULL OR DATE(o.createdAt) <= :endDate) AND " +
+           "(:excludeCancelled IS NULL OR :excludeCancelled = false OR o.status <> :cancelledStatus)")
+    Page<Order> searchOrders(@Param("keyword") String keyword,
+                            @Param("status") Order.Status status,
+                            @Param("playerId") Long playerId,
+                            @Param("today") Boolean today,
+                            @Param("startDate") java.time.LocalDate startDate,
+                            @Param("endDate") java.time.LocalDate endDate,
+                            @Param("excludeCancelled") Boolean excludeCancelled,
+                            @Param("cancelledStatus") Order.Status cancelledStatus,
+                            Pageable pageable);
+
     @Query("SELECT o FROM Order o WHERE (o.currentPlayer.id = :playerId OR o.currentPlayer2.id = :playerId) ORDER BY o.createdAt DESC")
     List<Order> findByPlayerId(@Param("playerId") Long playerId);
 
@@ -69,4 +90,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Object[]> findDailyIncomeStats(@Param("status") Order.Status status, @Param("startTime") LocalDateTime startTime);
 
     List<Order> findByStatusAndCreatedAtBefore(Order.Status status, LocalDateTime createdAt);
+    
+    List<Order> findByStatusAndCreatedAtAfter(Order.Status status, LocalDateTime createdAt);
+    
+    List<Order> findByBossIdAndStatus(Long bossId, Order.Status status);
+    
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.boss.id = :bossId")
+    long countByBossId(@Param("bossId") Long bossId);
 }

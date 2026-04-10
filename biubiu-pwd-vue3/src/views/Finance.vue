@@ -374,7 +374,7 @@ const initPieChart = () => {
           { name: '平台抽成', value: 0 },
           { name: '取消订单', value: 0 }
         ],
-        color: ['#67c23a', '#409eff', '#f56c6c']
+        color: ['#667eea', '#f0c27f', '#f56c6c']
       }
     ]
   }
@@ -436,11 +436,11 @@ const initLineChart = () => {
         type: 'line',
         smooth: true,
         data: amounts.length > 0 ? amounts : [0],
-        itemStyle: { color: '#409eff' },
+        itemStyle: { color: '#667eea' },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
-            { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
+            { offset: 0, color: 'rgba(102, 126, 234, 0.3)' },
+            { offset: 1, color: 'rgba(102, 126, 234, 0.05)' }
           ])
         }
       },
@@ -449,7 +449,7 @@ const initLineChart = () => {
         type: 'bar',
         yAxisIndex: 1,
         data: counts.length > 0 ? counts : [0],
-        itemStyle: { color: '#67c23a' }
+        itemStyle: { color: '#f0c27f' }
       }
     ]
   }
@@ -540,7 +540,7 @@ watch(() => adminStats.value, () => {
 <style scoped lang="scss">
 .finance-page {
   padding: 20px;
-  background: #f5f7fa;
+  background: #f8f8fc;
   min-height: 100vh;
 }
 
@@ -612,8 +612,8 @@ watch(() => adminStats.value, () => {
   }
   
   &.primary .stat-icon {
-    background: #ecf5ff;
-    color: #409eff;
+    background: #fff5f5;
+    color: #ff6b6b;
   }
   
   &.info .stat-icon {
@@ -622,8 +622,8 @@ watch(() => adminStats.value, () => {
   }
   
   &.success .stat-icon {
-    background: #f0f9eb;
-    color: #67c23a;
+    background: #fff8f0;
+    color: #f0c27f;
   }
   
   &.warning .stat-icon {
@@ -705,7 +705,7 @@ watch(() => adminStats.value, () => {
   transition: background 0.2s;
   
   &:hover {
-    background: #ecf5ff;
+    background: #fff5f5;
   }
   
   &.top3 {
@@ -751,14 +751,14 @@ watch(() => adminStats.value, () => {
   
   .rank-bar {
     height: 100%;
-    background: linear-gradient(90deg, #409eff 0%, #67c23a 100%);
+    background: linear-gradient(90deg, #ff6b6b 0%, #f0c27f 100%);
     border-radius: 3px;
     transition: width 0.5s ease;
   }
   
   .rank-income {
     font-weight: 700;
-    color: #67c23a;
+    color: #f0c27f;
     font-size: 15px;
     white-space: nowrap;
   }
@@ -826,7 +826,7 @@ watch(() => adminStats.value, () => {
 
 .records-table {
   :deep(th) {
-    background: #f5f7fa;
+    background: #f8f8fc;
     font-weight: 600;
     color: #606266;
   }
@@ -846,7 +846,7 @@ watch(() => adminStats.value, () => {
     font-size: 15px;
     
     &.income {
-      color: #67c23a;
+      color: #f0c27f;
     }
     
     &.expense {
@@ -856,7 +856,7 @@ watch(() => adminStats.value, () => {
   
   .order-link {
     font-family: monospace;
-    color: #409eff;
+    color: #ff6b6b;
     font-weight: 500;
   }
   

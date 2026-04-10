@@ -50,6 +50,7 @@ public class AuthController {
 
         UserResponse response = UserResponse.builder()
                 .id(user.getId())
+                .playerNo(user.getPlayerNo())
                 .phone(user.getPhone())
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())

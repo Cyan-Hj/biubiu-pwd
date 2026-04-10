@@ -22,13 +22,17 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         User user = userRepository.findByPhone(phone)
                 .orElseThrow(() -> new UsernameNotFoundException("手机号或密码错误"));
 
+        // 检查账号是否被禁用
+        boolean enabled = user.getEnabled() != null ? user.getEnabled() : true;
+        boolean accountNonLocked = enabled;
+
         return new org.springframework.security.core.userdetails.User(
                 user.getPhone(),
                 user.getPassword(),
-                user.getStatus() == User.Status.active,
+                user.getStatus() == User.Status.active && enabled,
                 true,
                 true,
-                true,
+                accountNonLocked,
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name().toUpperCase()))
         );
     }

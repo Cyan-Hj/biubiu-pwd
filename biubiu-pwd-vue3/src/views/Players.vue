@@ -93,13 +93,86 @@
             <div class="stat-value">{{ playerStats.total }}</div>
           </div>
         </div>
+        <div class="stat-card upgrade" @click="showUpgradePanel = !showUpgradePanel" style="cursor: pointer;">
+          <div class="stat-icon"><el-icon><TopRight /></el-icon></div>
+          <div class="stat-info">
+            <div class="stat-label">升级申请</div>
+            <div class="stat-value">{{ pendingUpgradeCount }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 等级升级审批面板 -->
+      <div v-if="showUpgradePanel" class="upgrade-panel">
+        <div class="upgrade-panel-header">
+          <span class="upgrade-panel-title">等级升级申请</span>
+          <div class="upgrade-panel-actions">
+            <el-button v-if="selectedUpgradeIds.length > 0" type="success" size="small" @click="handleBatchApprove">
+              <el-icon><Check /></el-icon>一键批准 ({{ selectedUpgradeIds.length }})
+            </el-button>
+            <el-button size="small" @click="loadUpgradeApplications">
+              <el-icon><Refresh /></el-icon>刷新
+            </el-button>
+          </div>
+        </div>
+        <el-table :data="upgradeApplications" v-loading="upgradeLoading" stripe size="small" @selection-change="val => selectedUpgradeIds = val.map(v => v.id)">
+          <el-table-column type="selection" width="45" :selectable="row => row.status === 'PENDING'" />
+          <el-table-column label="陪玩师" min-width="120">
+            <template #default="{ row }">
+              <span style="font-weight: 500; color: #303133;">{{ row.playerNo }} {{ row.playerNickname }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="当前等级" width="110">
+            <template #default="{ row }">
+              <el-tag :type="getLevelType(row.currentLevel)" size="small" effect="light">{{ row.currentLevel }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="申请等级" width="110">
+            <template #default="{ row }">
+              <el-tag :type="getLevelType(row.requestedLevel)" size="small" effect="plain">{{ row.requestedLevel }}</el-tag>
+              <div v-if="row.requestedLevelPrice" style="font-size: 11px; color: #ff6b6b; margin-top: 2px;">¥{{ row.requestedLevelPrice }}/h</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="理由" min-width="120" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span style="color: #606266; font-size: 12px;">{{ row.reason || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="90">
+            <template #default="{ row }">
+              <el-tag :type="getUpgradeStatusType(row.status)" size="small" effect="light">
+                {{ getUpgradeStatusText(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="时间" width="140">
+            <template #default="{ row }">
+              <span style="font-size: 12px; color: #909399;">{{ formatUpgradeDate(row.createdAt) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="160" fixed="right">
+            <template #default="{ row }">
+              <div class="action-group">
+                <el-button v-if="row.status === 'PENDING'" type="success" size="small" @click="handleApproveUpgrade(row)">
+                  <el-icon><Check /></el-icon>批准
+                </el-button>
+                <el-button v-if="row.status === 'PENDING'" type="danger" size="small" @click="handleRejectUpgrade(row)">
+                  <el-icon><CircleClose /></el-icon>拒绝
+                </el-button>
+                <span v-if="row.status !== 'PENDING'" style="font-size: 12px; color: #909399;">
+                  {{ row.reviewerNickname || '-' }}
+                </span>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
 
       <div class="table-container">
         <el-table :data="players" v-loading="loading" stripe class="player-table">
-          <el-table-column prop="id" label="ID" width="60" align="center">
+          <el-table-column prop="playerNo" label="编号" width="100" align="center">
             <template #default="{ row }">
-              <span class="id-text">{{ row.id }}</span>
+              <span class="player-no">{{ row.playerNo || '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="nickname" label="昵称" min-width="100" show-overflow-tooltip>
@@ -158,7 +231,6 @@
               </el-badge>
             </template>
           </el-table-column>
-          <!-- 操作列 -->
           <el-table-column label="操作" width="280" fixed="right">
             <template #default="{ row }">
               <div class="action-group" v-if="isAdmin">
@@ -288,7 +360,6 @@
         <el-button type="warning" @click="submitResetPassword">确认重置</el-button>
       </template>
     </el-dialog>
-
   </div>
 </template>
 
@@ -297,8 +368,9 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPlayers, approvePlayer, updatePlayer, resetPassword, deletePlayer } from '@/api/users'
 import { getLevelPrices } from '@/api/system'
+import { getPendingLevelApplications, approveLevelApplication, rejectLevelApplication, batchApproveLevelApplications } from '@/api/levelUpgrade'
 import { useUserStore } from '@/stores/user'
-import { UserFilled, Search, Timer, CircleCheck, CircleClose, Check, Edit, Key, Grid, Delete } from '@element-plus/icons-vue'
+import { UserFilled, Search, Timer, CircleCheck, CircleClose, Check, Edit, Key, Grid, Delete, TopRight, Refresh } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -313,7 +385,7 @@ const searchQuery = ref('')
 const statusFilter = ref('')
 const levelFilter = ref('')
 const availableLevels = ref([])
-const levelPriceMap = ref({}) // 等级价格映射
+const levelPriceMap = ref({})
 
 const playerStats = ref({
   pending: 0,
@@ -343,21 +415,22 @@ const resetPwdForm = reactive({
   password: ''
 })
 
+const showUpgradePanel = ref(false)
+const upgradeLoading = ref(false)
+const upgradeApplications = ref([])
+const selectedUpgradeIds = ref([])
+
+const pendingUpgradeCount = computed(() => {
+  return upgradeApplications.value.filter(a => a.status === 'PENDING').length
+})
+
 const getStatusType = (status) => {
-  const types = {
-    pending: 'warning',
-    active: 'success',
-    disabled: 'danger'
-  }
+  const types = { pending: 'warning', active: 'success', disabled: 'danger' }
   return types[status] || 'info'
 }
 
 const getStatusText = (status) => {
-  const texts = {
-    pending: '待审核',
-    active: '已通过',
-    disabled: '已禁用'
-  }
+  const texts = { pending: '待审核', active: '已通过', disabled: '已禁用' }
   return texts[status] || status
 }
 
@@ -372,11 +445,26 @@ const getLevelType = (level) => {
   return types[level] || 'primary'
 }
 
+const getUpgradeStatusType = (status) => {
+  const types = { PENDING: 'warning', APPROVED: 'success', REJECTED: 'danger' }
+  return types[status] || 'info'
+}
+
+const getUpgradeStatusText = (status) => {
+  const texts = { PENDING: '待审核', APPROVED: '已通过', REJECTED: '已拒绝' }
+  return texts[status] || status
+}
+
+const formatUpgradeDate = (date) => {
+  if (!date) return '-'
+  const d = new Date(date)
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+}
+
 const loadLevels = async () => {
   try {
     const res = await getLevelPrices()
     availableLevels.value = res.data.map(item => item.level)
-    // 构建等级价格映射
     levelPriceMap.value = {}
     res.data.forEach(item => {
       levelPriceMap.value[item.level] = item.defaultPrice
@@ -413,6 +501,18 @@ const loadPlayers = async () => {
   }
 }
 
+const loadUpgradeApplications = async () => {
+  upgradeLoading.value = true
+  try {
+    const res = await getPendingLevelApplications()
+    upgradeApplications.value = res.data || []
+  } catch (error) {
+    console.error('加载升级申请失败', error)
+  } finally {
+    upgradeLoading.value = false
+  }
+}
+
 const handleSearch = () => {
   page.value = 1
   loadPlayers()
@@ -432,12 +532,10 @@ const handleApprove = (row) => {
   currentPlayer.value = row
   const defaultLevel = availableLevels.value[0] || '机密娱乐'
   approveForm.level = defaultLevel
-  // 自动填充默认价格
   approveForm.pricePerHour = levelPriceMap.value[defaultLevel] || 50
   approveDialogVisible.value = true
 }
 
-// 审核对话框等级变化时自动填充价格
 const handleApproveLevelChange = (level) => {
   if (level && levelPriceMap.value[level]) {
     approveForm.pricePerHour = levelPriceMap.value[level]
@@ -466,7 +564,6 @@ const handleEdit = (row) => {
   editDialogVisible.value = true
 }
 
-// 编辑对话框等级变化时自动填充价格
 const handleEditLevelChange = (level) => {
   if (level && levelPriceMap.value[level]) {
     editForm.pricePerHour = levelPriceMap.value[level]
@@ -516,7 +613,60 @@ const handleDelete = async (row) => {
     loadPlayers()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '删除失败')
+    }
+  }
+}
+
+const handleApproveUpgrade = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定批准 "${row.playerNickname}" 升级到 "${row.requestedLevel}" 吗？`,
+      '批准升级',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'success' }
+    )
+    await approveLevelApplication(row.id)
+    ElMessage.success('已批准')
+    loadUpgradeApplications()
+    loadPlayers()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('操作失败')
+    }
+  }
+}
+
+const handleRejectUpgrade = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定拒绝 "${row.playerNickname}" 的升级申请吗？`,
+      '拒绝升级',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    await rejectLevelApplication(row.id)
+    ElMessage.success('已拒绝')
+    loadUpgradeApplications()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('操作失败')
+    }
+  }
+}
+
+const handleBatchApprove = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定一键批准选中的 ${selectedUpgradeIds.value.length} 个申请吗？`,
+      '一键批准',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'success' }
+    )
+    await batchApproveLevelApplications(selectedUpgradeIds.value)
+    ElMessage.success('批量审批完成')
+    selectedUpgradeIds.value = []
+    loadUpgradeApplications()
+    loadPlayers()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('批量审批失败')
     }
   }
 }
@@ -524,20 +674,21 @@ const handleDelete = async (row) => {
 onMounted(() => {
   loadLevels()
   loadPlayers()
+  loadUpgradeApplications()
 })
 </script>
 
 <style scoped lang="scss">
 .players-page {
   padding: 20px;
-  background: #f5f7fa;
+  background: #f8f8fc;
   min-height: 100vh;
 }
 
 .player-card {
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  
+
   :deep(.el-card__header) {
     padding: 20px;
     border-bottom: 1px solid #ebeef5;
@@ -556,12 +707,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  
+
   .title-icon {
     font-size: 24px;
-    color: #409eff;
+    color: #ff6b6b;
   }
-  
+
   .title-text {
     font-size: 20px;
     font-weight: 600;
@@ -586,14 +737,13 @@ onMounted(() => {
   gap: 5px;
 }
 
-// 筛选行
 .filter-row {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 15px;
   flex-wrap: wrap;
-  
+
   .filter-label {
     font-size: 14px;
     color: #606266;
@@ -602,7 +752,6 @@ onMounted(() => {
   }
 }
 
-// 等级筛选
 .level-filter {
   :deep(.el-radio-button__inner) {
     display: flex;
@@ -610,14 +759,14 @@ onMounted(() => {
     gap: 5px;
     padding: 8px 16px;
     font-size: 13px;
-    
+
     .level-tag {
       margin: 0;
       border: none;
       background: transparent;
     }
   }
-  
+
   :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
     .level-tag {
       background: #fff;
@@ -625,7 +774,6 @@ onMounted(() => {
   }
 }
 
-// 状态筛选
 .status-filter {
   :deep(.el-radio-button__inner) {
     display: flex;
@@ -636,7 +784,6 @@ onMounted(() => {
   }
 }
 
-// 统计卡片
 .stats-row {
   display: flex;
   gap: 15px;
@@ -655,12 +802,12 @@ onMounted(() => {
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   transition: transform 0.2s, box-shadow 0.2s;
-  
+
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
-  
+
   .stat-icon {
     width: 50px;
     height: 50px;
@@ -670,45 +817,98 @@ onMounted(() => {
     justify-content: center;
     font-size: 24px;
   }
-  
+
   .stat-info {
     flex: 1;
   }
-  
+
   .stat-label {
     font-size: 13px;
     color: #909399;
     margin-bottom: 5px;
   }
-  
+
   .stat-value {
     font-size: 24px;
     font-weight: 700;
     color: #303133;
   }
-  
+
   &.pending .stat-icon {
     background: #fdf6ec;
     color: #e6a23c;
   }
-  
+
   &.active .stat-icon {
-    background: #f0f9eb;
-    color: #67c23a;
+    background: #fff8f0;
+    color: #f0c27f;
   }
-  
+
   &.disabled .stat-icon {
     background: #fef0f0;
     color: #f56c6c;
   }
-  
+
   &.total .stat-icon {
-    background: #ecf5ff;
-    color: #409eff;
+    background: #fff5f5;
+    color: #ff6b6b;
+  }
+
+  &.upgrade {
+    border: 2px solid #e8f4e8;
+    background: linear-gradient(135deg, #f0f9eb 0%, #fff 100%);
+
+    .stat-icon {
+      background: #f0f9eb;
+      color: #67c23a;
+    }
+
+    .stat-value {
+      color: #67c23a;
+    }
   }
 }
 
-// 表格样式
+.upgrade-panel {
+  margin-bottom: 24px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e8f4e8;
+  overflow: hidden;
+
+  .upgrade-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #f0f9eb 0%, #e8f5e9 100%);
+
+    .upgrade-panel-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #2d6a2e;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .upgrade-panel-actions {
+      display: flex;
+      gap: 8px;
+    }
+  }
+
+  :deep(.el-table) {
+    border-radius: 0;
+
+    th.el-table__cell {
+      background: #fafbfc;
+      font-weight: 600;
+      color: #606266;
+    }
+  }
+}
+
 .table-container {
   margin-top: 20px;
   overflow-x: auto;
@@ -717,65 +917,66 @@ onMounted(() => {
 
 .player-table {
   min-width: 950px;
-  
+
   :deep(th) {
-    background: #f5f7fa;
+    background: #f8f8fc;
     font-weight: 600;
     color: #606266;
   }
-  
-  .id-text {
+
+  .player-no {
     font-family: monospace;
     font-weight: 600;
-    color: #909399;
+    color: #ff6b6b;
+    font-size: 13px;
   }
-  
+
   .nickname-cell {
     display: flex;
     align-items: center;
     gap: 10px;
-    
+
     .avatar {
       flex-shrink: 0;
     }
-    
+
     .nickname-text {
       font-weight: 500;
       color: #303133;
     }
   }
-  
+
   .phone-text {
     font-family: monospace;
     color: #606266;
   }
-  
+
   .price-text {
     font-weight: 600;
-    color: #409eff;
+    color: #ff6b6b;
   }
-  
+
   .income-text {
     font-weight: 600;
-    color: #67c23a;
+    color: #f0c27f;
   }
-  
+
   .balance-text {
     font-weight: 600;
     color: #e6a23c;
   }
-  
+
   .order-count {
     font-weight: 600;
     color: #606266;
 
     &.idle {
-      color: #67c23a;
+      color: #f0c27f;
       font-size: 12px;
     }
 
     &.in-service {
-      color: #409eff;
+      color: #ff6b6b;
       font-size: 12px;
     }
   }
@@ -793,23 +994,21 @@ onMounted(() => {
   }
 }
 
-// 分页
 .pagination {
   margin-top: 25px;
   justify-content: flex-end;
 }
 
-// 对话框样式
 .player-dialog {
   :deep(.el-dialog__header) {
     padding: 20px;
     border-bottom: 1px solid #ebeef5;
-    
+
     .el-dialog__title {
       font-weight: 600;
     }
   }
-  
+
   :deep(.el-dialog__body) {
     padding: 25px 20px;
   }
@@ -821,16 +1020,16 @@ onMounted(() => {
     align-items: center;
     gap: 12px;
     padding: 10px;
-    background: #f5f7fa;
+    background: #f8f8fc;
     border-radius: 8px;
-    
+
     .player-name {
       font-weight: 600;
       font-size: 15px;
       color: #303133;
     }
   }
-  
+
   .form-tip {
     color: #909399;
     font-size: 12px;
@@ -838,4 +1037,416 @@ onMounted(() => {
   }
 }
 
+@media (max-width: 768px) {
+  .players-page {
+    padding: 12px;
+  }
+
+  .player-card {
+    :deep(.el-card__header) {
+      padding: 16px;
+    }
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .header-title {
+    .title-icon {
+      font-size: 20px;
+    }
+
+    .title-text {
+      font-size: 18px;
+    }
+  }
+
+  .header-actions {
+    .search-input {
+      flex: 1;
+      width: auto;
+    }
+  }
+
+  .filter-row {
+    margin-bottom: 12px;
+
+    .filter-label {
+      font-size: 13px;
+    }
+  }
+
+  .level-filter,
+  .status-filter {
+    :deep(.el-radio-button__inner) {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+  }
+
+  .stats-row {
+    gap: 10px;
+    margin: 16px 0;
+  }
+
+  .stat-card {
+    flex: 0 0 calc(33.333% - 7px);
+    min-width: auto;
+    padding: 12px;
+    gap: 8px;
+
+    .stat-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 18px;
+    }
+
+    .stat-info {
+      .stat-label {
+        font-size: 11px;
+        margin-bottom: 2px;
+      }
+
+      .stat-value {
+        font-size: 18px;
+      }
+    }
+  }
+
+  .upgrade-panel {
+    margin-bottom: 16px;
+
+    .upgrade-panel-header {
+      padding: 12px 14px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+
+      .upgrade-panel-title {
+        font-size: 14px;
+      }
+
+      .upgrade-panel-actions {
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+
+    :deep(.el-table) {
+      font-size: 12px;
+
+      th.el-table__cell,
+      td.el-table__cell {
+        padding: 8px 6px;
+      }
+    }
+  }
+
+  .table-container {
+    margin-top: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+  }
+
+  .player-table {
+    min-width: 800px;
+    font-size: 12px;
+
+    :deep(th) {
+      padding: 10px 6px;
+    }
+
+    :deep(td) {
+      padding: 8px 6px;
+    }
+
+    .nickname-cell {
+      gap: 6px;
+
+      .avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 12px;
+      }
+
+      .nickname-text {
+        font-size: 12px;
+      }
+    }
+
+    .action-group {
+      gap: 3px;
+
+      .el-button {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+    }
+  }
+
+  .pagination {
+    margin-top: 16px;
+    justify-content: center;
+  }
+
+  .player-dialog {
+    :deep(.el-dialog) {
+      width: 90% !important;
+      max-width: 450px;
+    }
+
+    :deep(.el-dialog__header) {
+      padding: 16px;
+    }
+
+    :deep(.el-dialog__body) {
+      padding: 16px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .players-page {
+    padding: 8px;
+  }
+
+  .player-card {
+    border-radius: 10px;
+
+    :deep(.el-card__header) {
+      padding: 12px;
+    }
+  }
+
+  .header-title {
+    .title-icon {
+      font-size: 18px;
+    }
+
+    .title-text {
+      font-size: 16px;
+    }
+  }
+
+  .header-actions {
+    flex-direction: column;
+    gap: 8px;
+
+    .search-input {
+      width: 100%;
+    }
+
+    .search-btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .filter-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+
+    .filter-label {
+      font-size: 12px;
+    }
+  }
+
+  .level-filter,
+  .status-filter {
+    width: 100%;
+
+    :deep(.el-radio-group) {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    :deep(.el-radio-button) {
+      flex: 1;
+    }
+
+    :deep(.el-radio-button__inner) {
+      padding: 5px 8px;
+      font-size: 11px;
+      width: 100%;
+    }
+  }
+
+  .stats-row {
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .stat-card {
+    flex: 0 0 calc(50% - 4px);
+    padding: 10px;
+    gap: 6px;
+
+    .stat-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+
+    .stat-info {
+      .stat-label {
+        font-size: 10px;
+        margin-bottom: 1px;
+      }
+
+      .stat-value {
+        font-size: 16px;
+      }
+    }
+  }
+
+  .upgrade-panel {
+    margin-bottom: 12px;
+    border-radius: 8px;
+
+    .upgrade-panel-header {
+      padding: 10px 12px;
+
+      .upgrade-panel-title {
+        font-size: 13px;
+      }
+
+      .upgrade-panel-actions {
+        gap: 6px;
+
+        .el-button {
+          padding: 5px 10px;
+          font-size: 11px;
+        }
+      }
+    }
+
+    :deep(.el-table) {
+      font-size: 11px;
+
+      th.el-table__cell,
+      td.el-table__cell {
+        padding: 6px 4px;
+      }
+
+      .cell {
+        padding: 0 2px;
+      }
+    }
+  }
+
+  .table-container {
+    margin-top: 12px;
+    border-radius: 6px;
+  }
+
+  .player-table {
+    min-width: 700px;
+    font-size: 11px;
+
+    :deep(th) {
+      padding: 8px 4px;
+    }
+
+    :deep(td) {
+      padding: 6px 4px;
+    }
+
+    .player-no {
+      font-size: 11px;
+    }
+
+    .nickname-cell {
+      gap: 4px;
+
+      .avatar {
+        width: 20px;
+        height: 20px;
+        font-size: 10px;
+      }
+
+      .nickname-text {
+        font-size: 11px;
+      }
+    }
+
+    .phone-text,
+    .price-text,
+    .income-text,
+    .balance-text {
+      font-size: 11px;
+    }
+
+    .action-group {
+      gap: 2px;
+
+      .el-button {
+        padding: 3px 6px;
+        font-size: 10px;
+      }
+    }
+  }
+
+  .pagination {
+    margin-top: 12px;
+
+    :deep(.el-pagination) {
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    :deep(.el-pagination__sizes) {
+      margin-right: 0;
+    }
+
+    :deep(.el-pagination__total) {
+      display: block;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+  }
+
+  .player-dialog {
+    :deep(.el-dialog) {
+      width: 95% !important;
+      max-width: none;
+      margin: 10px auto;
+    }
+
+    :deep(.el-dialog__header) {
+      padding: 12px 16px;
+    }
+
+    :deep(.el-dialog__body) {
+      padding: 12px;
+    }
+
+    :deep(.el-dialog__footer) {
+      padding: 12px 16px;
+    }
+  }
+
+  .dialog-form {
+    .player-info {
+      padding: 8px;
+      gap: 8px;
+
+      .player-name {
+        font-size: 14px;
+      }
+    }
+
+    .form-tip {
+      font-size: 11px;
+    }
+  }
+}
 </style>

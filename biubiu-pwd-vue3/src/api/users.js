@@ -23,3 +23,24 @@ export const resetPassword = (id, data) => {
 export const deletePlayer = (id) => {
   return request.delete(`/users/${id}`)
 }
+
+// 客服账号管理
+export const getCustomerServiceList = () => {
+  return request.get('/users/customer-service')
+}
+
+export const createCustomerService = (data) => {
+  return request.post('/users/customer-service', data)
+}
+
+export const updateCustomerService = (id, data) => {
+  return request.put(`/users/customer-service/${id}`, data)
+}
+
+export const resetCustomerServicePassword = (id, data) => {
+  return request.post(`/users/customer-service/${id}/reset-password`, data)
+}
+
+export const deleteCustomerService = (id) => {
+  return request.delete(`/users/customer-service/${id}`)
+}

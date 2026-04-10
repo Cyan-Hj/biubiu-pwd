@@ -42,6 +42,9 @@ public class Order {
     @Enumerated(EnumType.ORDINAL)
     private Status status = Status.PENDING_ASSIGN;
 
+    @Column(length = 20)
+    private String orderType;
+
     @ManyToOne
     @JoinColumn(name = "current_player_id")
     private User currentPlayer;
@@ -101,6 +104,17 @@ public class Order {
 
     private LocalDateTime cancelledAt;
 
+    @Column(columnDefinition = "TEXT")
+    private String pauseReason;
+
+    private LocalDateTime pausedAt;
+
+    private LocalDateTime resumedAt;
+
+    @Column(name = "status_before_pause")
+    @Enumerated(EnumType.ORDINAL)
+    private Status statusBeforePause;
+
     // 完成订单截图
     @Column(name = "start_screenshot_url", length = 500)
     private String startScreenshotUrl;
@@ -114,7 +128,8 @@ public class Order {
         PENDING_ACCEPT_2,  // 2: 待接单2（双人第二个）
         IN_SERVICE,        // 3: 服务中
         COMPLETED,         // 4: 已完成
-        CANCELLED          // 5: 已取消
+        CANCELLED,         // 5: 已取消
+        PAUSED             // 6: 暂存
     }
 
     public enum PlayerCount {

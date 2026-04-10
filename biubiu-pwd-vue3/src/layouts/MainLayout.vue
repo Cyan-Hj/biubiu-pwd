@@ -1,22 +1,22 @@
 <template>
   <el-container class="layout-container">
-    <el-aside width="220px" class="aside">
+    <el-aside v-if="!isMobile" width="220px" class="aside">
       <div class="logo">
         <div class="logo-icon">
-          <el-icon size="28"><Monitor /></el-icon>
+          <span class="logo-text-icon">温柚</span>
         </div>
         <div class="logo-text">
-          <h3>Biubiu陪玩</h3>
-          <span>专业陪玩平台</span>
+          <h3>温柚纯女电竞</h3>
+          <span>专业 · 品质 · 信赖</span>
         </div>
       </div>
       <el-menu
         :default-active="$route.path"
         router
         class="menu"
-        background-color="#1a1a2e"
-        text-color="#a0a3bd"
-        active-text-color="#fff"
+        background-color="transparent"
+        text-color="#5a5a7a"
+        active-text-color="#667eea"
         :collapse-transition="false"
       >
         <el-menu-item index="/dashboard" class="menu-item">
@@ -24,24 +24,24 @@
           <span>首页概览</span>
         </el-menu-item>
 
-        <el-menu-item v-if="isAdmin || isCustomerService" index="/players" class="menu-item">
-          <el-icon><UserFilled /></el-icon>
-          <span>陪玩师管理</span>
-        </el-menu-item>
-
         <el-menu-item index="/orders" class="menu-item">
           <el-icon><List /></el-icon>
           <span>订单管理</span>
         </el-menu-item>
 
-        <el-menu-item index="/finance" class="menu-item">
-          <el-icon><Money /></el-icon>
-          <span>财务管理</span>
+        <el-menu-item v-if="isAdmin || isCustomerService" index="/players" class="menu-item">
+          <el-icon><UserFilled /></el-icon>
+          <span>陪玩师管理</span>
         </el-menu-item>
 
         <el-menu-item v-if="isAdmin || isCustomerService" index="/boss" class="menu-item">
           <el-icon><User /></el-icon>
-          <span>老板预存</span>
+          <span>老板管理</span>
+        </el-menu-item>
+
+        <el-menu-item index="/finance" class="menu-item">
+          <el-icon><Money /></el-icon>
+          <span>财务管理</span>
         </el-menu-item>
 
         <el-menu-item v-if="isAdmin" index="/withdrawals" class="menu-item">
@@ -60,22 +60,96 @@
       </div>
     </el-aside>
 
+    <el-drawer
+      v-if="isMobile"
+      v-model="drawerVisible"
+      direction="ltr"
+      :show-close="false"
+      :with-header="false"
+      size="260px"
+      class="mobile-drawer"
+    >
+      <div class="aside mobile-aside">
+        <div class="logo">
+          <div class="logo-icon">
+            <span class="logo-text-icon">温柚</span>
+          </div>
+          <div class="logo-text">
+            <h3>温柚纯女电竞</h3>
+            <span>专业 · 品质 · 信赖</span>
+          </div>
+        </div>
+        <el-menu
+          :default-active="$route.path"
+          router
+          class="menu"
+          background-color="transparent"
+          text-color="#5a5a7a"
+          active-text-color="#667eea"
+          :collapse-transition="false"
+          @select="handleMenuSelect"
+        >
+          <el-menu-item index="/dashboard" class="menu-item">
+            <el-icon><HomeFilled /></el-icon>
+            <span>首页概览</span>
+          </el-menu-item>
+
+          <el-menu-item index="/orders" class="menu-item">
+            <el-icon><List /></el-icon>
+            <span>订单管理</span>
+          </el-menu-item>
+
+          <el-menu-item v-if="isAdmin || isCustomerService" index="/players" class="menu-item">
+            <el-icon><UserFilled /></el-icon>
+            <span>陪玩师管理</span>
+          </el-menu-item>
+
+          <el-menu-item v-if="isAdmin || isCustomerService" index="/boss" class="menu-item">
+            <el-icon><User /></el-icon>
+            <span>老板管理</span>
+          </el-menu-item>
+
+          <el-menu-item index="/finance" class="menu-item">
+            <el-icon><Money /></el-icon>
+            <span>财务管理</span>
+          </el-menu-item>
+
+          <el-menu-item v-if="isAdmin" index="/withdrawals" class="menu-item">
+            <el-icon><Check /></el-icon>
+            <span>提现审核</span>
+          </el-menu-item>
+
+          <el-menu-item v-if="isAdmin" index="/settings" class="menu-item">
+            <el-icon><Setting /></el-icon>
+            <span>系统设置</span>
+          </el-menu-item>
+        </el-menu>
+
+        <div class="aside-footer">
+          <div class="version">v1.0.0</div>
+        </div>
+      </div>
+    </el-drawer>
+
     <el-container>
       <el-header class="header">
         <div class="header-left">
+          <el-icon v-if="isMobile" class="menu-toggle" @click="drawerVisible = true">
+            <Expand />
+          </el-icon>
           <breadcrumb />
         </div>
         <div class="header-right">
           <el-dropdown @command="handleCommand" trigger="click">
             <div class="user-info">
-              <el-avatar :size="36" class="user-avatar">
+              <el-avatar :size="isMobile ? 30 : 36" class="user-avatar">
                 {{ userStore.userInfo?.nickname?.charAt(0) || 'U' }}
               </el-avatar>
-              <div class="user-detail">
+              <div v-if="!isMobile" class="user-detail">
                 <span class="user-name">{{ userStore.userInfo?.nickname }}</span>
                 <span class="user-role">{{ getRoleText() }}</span>
               </div>
-              <el-icon class="dropdown-icon"><arrow-down /></el-icon>
+              <el-icon v-if="!isMobile" class="dropdown-icon"><arrow-down /></el-icon>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
@@ -99,22 +173,31 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { 
   HomeFilled, UserFilled, List, Money, Check, Setting, 
-  ArrowDown, User, SwitchButton, Monitor 
+  ArrowDown, User, SwitchButton, Expand
 } from '@element-plus/icons-vue'
-
-// 导入 User 图标用于老板预存菜单
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const isAdmin = computed(() => userStore.isAdmin)
 const isCustomerService = computed(() => userStore.isCustomerService)
+
+const isMobile = ref(false)
+const drawerVisible = ref(false)
+
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
+
+const handleMenuSelect = () => {
+  drawerVisible.value = false
+}
 
 const getRoleText = () => {
   if (isAdmin.value) return '管理员'
@@ -123,7 +206,9 @@ const getRoleText = () => {
 }
 
 const handleCommand = (command) => {
-  if (command === 'logout') {
+  if (command === 'profile') {
+    router.push('/profile')
+  } else if (command === 'logout') {
     ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
@@ -135,53 +220,75 @@ const handleCommand = (command) => {
     })
   }
 }
+
+onMounted(async () => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+  try {
+    await userStore.fetchUserInfo()
+  } catch (e) {}
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+})
 </script>
 
 <style scoped lang="scss">
 .layout-container {
   height: 100vh;
-  background: #f5f7fa;
+  background: linear-gradient(135deg, #f8f9fc 0%, #f0f2f8 100%);
 }
 
 .aside {
-  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  background: linear-gradient(180deg, #f8f9fc 0%, #f0f2f8 50%, #e8ebf5 100%);
   display: flex;
   flex-direction: column;
-  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 2px 0 12px rgba(102, 126, 234, 0.08);
+  border-right: 1px solid rgba(102, 126, 234, 0.1);
 }
 
 .logo {
-  height: 80px;
+  height: 72px;
   display: flex;
   align-items: center;
   padding: 0 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
   
   .logo-icon {
-    width: 44px;
-    height: 44px;
-    background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
-    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
     margin-right: 12px;
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+  
+  .logo-text-icon {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
   }
   
   .logo-text {
     h3 {
-      color: #fff;
-      font-size: 18px;
+      color: #2d2d4a;
+      font-size: 15px;
       font-weight: 600;
       margin: 0;
       letter-spacing: 1px;
+      white-space: nowrap;
     }
     
     span {
-      color: rgba(255, 255, 255, 0.5);
-      font-size: 12px;
+      color: #8a8ab0;
+      font-size: 11px;
+      letter-spacing: 1px;
     }
   }
 }
@@ -189,29 +296,41 @@ const handleCommand = (command) => {
 .menu {
   flex: 1;
   border-right: none;
-  padding: 12px 0;
+  padding: 12px 10px;
   
   :deep(.el-menu-item) {
-    height: 50px;
-    line-height: 50px;
-    margin: 4px 12px;
-    border-radius: 8px;
-    transition: all 0.3s;
+    height: 48px;
+    line-height: 48px;
+    margin: 4px 0;
+    border-radius: 10px;
+    transition: all 0.3s ease;
     
     &:hover {
-      background: rgba(64, 158, 255, 0.1) !important;
-      color: #fff !important;
+      background: rgba(102, 126, 234, 0.08) !important;
+      color: #667eea !important;
     }
     
     &.is-active {
-      background: linear-gradient(135deg, #409eff 0%, #67c23a 100%) !important;
-      color: #fff !important;
-      box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+      background: linear-gradient(90deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.06) 100%) !important;
+      color: #667eea !important;
+      font-weight: 600;
+      
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 20px;
+        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+        border-radius: 0 2px 2px 0;
+      }
     }
     
     .el-icon {
       font-size: 18px;
-      margin-right: 12px;
+      margin-right: 10px;
     }
     
     span {
@@ -222,29 +341,46 @@ const handleCommand = (command) => {
 }
 
 .aside-footer {
-  padding: 16px 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px 20px;
+  border-top: 1px solid rgba(102, 126, 234, 0.1);
   
   .version {
-    color: rgba(255, 255, 255, 0.4);
+    color: #a0a0c0;
     font-size: 12px;
     text-align: center;
   }
 }
 
 .header {
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.06);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 1px 4px rgba(102, 126, 234, 0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  height: 64px;
+  height: 60px;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.08);
 }
 
 .header-left {
   display: flex;
   align-items: center;
+  gap: 12px;
+}
+
+.menu-toggle {
+  font-size: 22px;
+  color: #2d2d4a;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(102, 126, 234, 0.08);
+    color: #667eea;
+  }
 }
 
 .header-right {
@@ -255,18 +391,18 @@ const handleCommand = (command) => {
 .user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
   padding: 6px 12px;
   border-radius: 8px;
-  transition: background 0.3s;
+  transition: background 0.25s;
   
   &:hover {
-    background: #f5f7fa;
+    background: rgba(102, 126, 234, 0.08);
   }
   
   .user-avatar {
-    background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: #fff;
     font-weight: 600;
     font-size: 14px;
@@ -279,24 +415,57 @@ const handleCommand = (command) => {
     .user-name {
       font-size: 14px;
       font-weight: 600;
-      color: #303133;
+      color: #2d2d4a;
     }
     
     .user-role {
       font-size: 12px;
-      color: #909399;
+      color: #8a8ab0;
     }
   }
   
   .dropdown-icon {
-    color: #c0c4cc;
+    color: #a0a0c0;
     font-size: 14px;
   }
 }
 
 .main {
-  background: #f5f7fa;
+  background: transparent;
   padding: 20px;
   overflow-y: auto;
+}
+
+.mobile-drawer {
+  :deep(.el-drawer__body) {
+    padding: 0;
+  }
+
+  :deep(.el-drawer) {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .mobile-aside {
+    height: 100%;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+    height: 50px;
+  }
+
+  .main {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .main {
+    padding: 8px;
+  }
 }
 </style>

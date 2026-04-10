@@ -35,6 +35,7 @@ public class UserController {
 
         UserResponse response = UserResponse.builder()
                 .id(user.getId())
+                .playerNo(user.getPlayerNo())
                 .phone(user.getPhone())
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())
@@ -80,6 +81,7 @@ public class UserController {
             long activeOrders = orderRepository.countByCurrentPlayerIdAndStatus(user.getId(), Order.Status.IN_SERVICE);
             return PlayerResponse.builder()
                     .id(user.getId())
+                    .playerNo(user.getPlayerNo())
                     .nickname(user.getNickname())
                     .phone(user.getPhone())
                     .level(user.getLevel())
@@ -110,6 +112,12 @@ public class UserController {
         user.setStatus(User.Status.active);
         user.setLevel(request.getLevel());
         user.setPricePerHour(request.getPricePerHour());
+
+        if (user.getPlayerNo() == null || user.getPlayerNo().isEmpty()) {
+            Integer maxNo = userRepository.findMaxPlayerNo();
+            int nextNo = (maxNo != null ? maxNo : 0) + 1;
+            user.setPlayerNo(String.format("P-%04d", nextNo));
+        }
 
         userRepository.save(user);
 
@@ -180,10 +188,138 @@ public class UserController {
         return ApiResponse.success(levels);
     }
 
+    @GetMapping("/profile")
+    public ApiResponse<UserResponse> getProfile() {
+        User user = getCurrentUserEntity();
+        UserResponse response = UserResponse.builder()
+                .id(user.getId())
+                .playerNo(user.getPlayerNo())
+                .phone(user.getPhone())
+                .nickname(user.getNickname())
+                .avatar(user.getAvatar())
+                .role(user.getRole())
+                .level(user.getLevel())
+                .pricePerHour(user.getPricePerHour())
+                .status(user.getStatus())
+                .totalIncome(user.getTotalIncome())
+                .availableBalance(user.getAvailableBalance())
+                .createdAt(user.getCreatedAt())
+                .build();
+        return ApiResponse.success(response);
+    }
+
+    @PutMapping("/nickname")
+    public ApiResponse<Void> updateNickname(@Valid @RequestBody UpdateNicknameRequest request) {
+        User user = getCurrentUserEntity();
+        user.setNickname(request.getNickname());
+        userRepository.save(user);
+        return ApiResponse.success("昵称修改成功", null);
+    }
+
+    @PutMapping("/password")
+    public ApiResponse<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        User user = getCurrentUserEntity();
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new RuntimeException("旧密码不正确");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        return ApiResponse.success("密码修改成功", null);
+    }
+
     private User getCurrentUserEntity() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String phone = authentication.getName();
         return userRepository.findByPhone(phone)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));
+    }
+
+    // ==================== 客服账号管理接口 ====================
+
+    @GetMapping("/customer-service")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<CustomerServiceResponse>> getCustomerServiceList() {
+        List<User> csList = userRepository.findByRoleOrderByCreatedAtDesc(User.Role.CUSTOMER_SERVICE);
+        List<CustomerServiceResponse> response = csList.stream()
+                .map(user -> CustomerServiceResponse.builder()
+                        .id(user.getId())
+                        .phone(user.getPhone())
+                        .nickname(user.getNickname())
+                        .enabled(user.getEnabled())
+                        .createdAt(user.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+        return ApiResponse.success(response);
+    }
+
+    @PostMapping("/customer-service")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> createCustomerService(@Valid @RequestBody CreateCustomerServiceRequest request) {
+        // 检查手机号是否已存在
+        if (userRepository.existsByPhone(request.getPhone())) {
+            throw new RuntimeException("手机号已被注册");
+        }
+
+        User cs = new User();
+        cs.setPhone(request.getPhone());
+        cs.setNickname(request.getNickname());
+        cs.setPassword(passwordEncoder.encode(request.getPassword()));
+        cs.setRole(User.Role.CUSTOMER_SERVICE);
+        cs.setStatus(User.Status.active);
+        cs.setEnabled(true);
+
+        userRepository.save(cs);
+        return ApiResponse.success("客服账号创建成功", null);
+    }
+
+    @PutMapping("/customer-service/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> updateCustomerService(@PathVariable Long id, @Valid @RequestBody UpdateCustomerServiceRequest request) {
+        User cs = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("客服账号不存在"));
+
+        if (cs.getRole() != User.Role.CUSTOMER_SERVICE) {
+            throw new RuntimeException("该用户不是客服账号");
+        }
+
+        if (request.getEnabled() != null) {
+            cs.setEnabled(request.getEnabled());
+        }
+
+        if (request.getNickname() != null && !request.getNickname().isEmpty()) {
+            cs.setNickname(request.getNickname());
+        }
+
+        userRepository.save(cs);
+        return ApiResponse.success("更新成功", null);
+    }
+
+    @PostMapping("/customer-service/{id}/reset-password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> resetCustomerServicePassword(@PathVariable Long id, @Valid @RequestBody ResetPasswordRequest request) {
+        User cs = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("客服账号不存在"));
+
+        if (cs.getRole() != User.Role.CUSTOMER_SERVICE) {
+            throw new RuntimeException("该用户不是客服账号");
+        }
+
+        cs.setPassword(passwordEncoder.encode(request.getPassword()));
+        userRepository.save(cs);
+        return ApiResponse.success("密码重置成功", null);
+    }
+
+    @DeleteMapping("/customer-service/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> deleteCustomerService(@PathVariable Long id) {
+        User cs = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("客服账号不存在"));
+
+        if (cs.getRole() != User.Role.CUSTOMER_SERVICE) {
+            throw new RuntimeException("该用户不是客服账号");
+        }
+
+        userRepository.delete(cs);
+        return ApiResponse.success("客服账号已删除", null);
     }
 }

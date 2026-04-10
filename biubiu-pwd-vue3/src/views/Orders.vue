@@ -42,6 +42,9 @@
               <el-radio-button :label="3">
                 <el-icon><Loading /></el-icon>服务中
               </el-radio-button>
+              <el-radio-button :label="6">
+                <el-icon><VideoPause /></el-icon>暂存
+              </el-radio-button>
               <el-radio-button :label="4">
                 <el-icon><CircleCheck /></el-icon>已完成
               </el-radio-button>
@@ -62,41 +65,74 @@
         </div>
       </template>
 
-      <!-- 统计卡片 -->
-      <div class="stats-row" v-if="!isPlayer">
-        <div class="stat-card pending">
-          <div class="stat-icon"><el-icon><CircleCheck /></el-icon></div>
-          <div class="stat-info">
-            <div class="stat-label">待分配</div>
-            <div class="stat-value">{{ orderStats.pending }}</div>
-          </div>
+      <!-- 搜索和统计区域 -->
+      <div v-if="!isPlayer">
+        <!-- 搜索框 -->
+        <div class="search-row">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索订单编号/老板名字/服务内容"
+            clearable
+            class="search-input"
+            @keyup.enter="handleSearch"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-button type="primary" @click="handleSearch">
+            <el-icon><Search /></el-icon>
+            搜索
+          </el-button>
+          <el-button v-if="searchKeyword" @click="handleClearSearch">
+            <el-icon><Close /></el-icon>
+            清除
+          </el-button>
         </div>
-        <div class="stat-card waiting">
-          <div class="stat-icon"><el-icon><Timer /></el-icon></div>
-          <div class="stat-info">
-            <div class="stat-label">待接单</div>
-            <div class="stat-value">{{ orderStats.waiting }}</div>
+        
+        <!-- 统计卡片 -->
+        <div class="stats-row">
+          <div class="stat-card pending">
+            <div class="stat-icon"><el-icon><CircleCheck /></el-icon></div>
+            <div class="stat-info">
+              <div class="stat-label">待分配</div>
+              <div class="stat-value">{{ orderStats.pending }}</div>
+            </div>
           </div>
-        </div>
-        <div class="stat-card in-service">
-          <div class="stat-icon"><el-icon><Loading /></el-icon></div>
-          <div class="stat-info">
-            <div class="stat-label">服务中</div>
-            <div class="stat-value">{{ orderStats.inService }}</div>
+          <div class="stat-card waiting">
+            <div class="stat-icon"><el-icon><Timer /></el-icon></div>
+            <div class="stat-info">
+              <div class="stat-label">待接单</div>
+              <div class="stat-value">{{ orderStats.waiting }}</div>
+            </div>
           </div>
-        </div>
-        <div class="stat-card completed">
-          <div class="stat-icon"><el-icon><CircleCheck /></el-icon></div>
-          <div class="stat-info">
-            <div class="stat-label">已完成</div>
-            <div class="stat-value">{{ orderStats.completed }}</div>
+          <div class="stat-card in-service">
+            <div class="stat-icon"><el-icon><Loading /></el-icon></div>
+            <div class="stat-info">
+              <div class="stat-label">服务中</div>
+              <div class="stat-value">{{ orderStats.inService }}</div>
+            </div>
           </div>
-        </div>
-        <div class="stat-card cancelled">
-          <div class="stat-icon"><el-icon><CircleClose /></el-icon></div>
-          <div class="stat-info">
-            <div class="stat-label">已取消</div>
-            <div class="stat-value">{{ orderStats.cancelled }}</div>
+          <div class="stat-card paused">
+            <div class="stat-icon"><el-icon><VideoPause /></el-icon></div>
+            <div class="stat-info">
+              <div class="stat-label">暂存</div>
+              <div class="stat-value">{{ orderStats.paused }}</div>
+            </div>
+          </div>
+          <div class="stat-card completed">
+            <div class="stat-icon"><el-icon><CircleCheck /></el-icon></div>
+            <div class="stat-info">
+              <div class="stat-label">已完成</div>
+              <div class="stat-value">{{ orderStats.completed }}</div>
+            </div>
+          </div>
+          <div class="stat-card cancelled">
+            <div class="stat-icon"><el-icon><CircleClose /></el-icon></div>
+            <div class="stat-info">
+              <div class="stat-label">已取消</div>
+              <div class="stat-value">{{ orderStats.cancelled }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -107,7 +143,10 @@
             <el-card class="order-item-card" :body-style="{ padding: '20px' }" shadow="hover">
               <template #header>
                 <div class="card-header-inner">
-                  <span class="order-no">{{ order.orderNo }}</span>
+                  <span class="order-no">
+                    {{ order.orderNo }}
+                    <el-tag v-if="order.orderType === 'huhang'" size="small" type="warning" style="margin-left: 6px">护航</el-tag>
+                  </span>
                   <el-tag :type="getStatusType(order.status)" effect="dark" size="small">
                     <el-icon v-if="order.status === 3" class="is-loading"><Loading /></el-icon>
                     {{ getStatusText(order.status) }}
@@ -125,19 +164,35 @@
                 </div>
                 <div class="info-row">
                   <span class="info-label">时长:</span>
-                  <span class="info-value">{{ order.serviceHours }}h (¥{{ order.pricePerHour }}/h)</span>
+                  <span class="info-value">{{ formatHoursToHM(order.serviceHours) }} (¥{{ order.pricePerHour }}/h)</span>
                 </div>
                 <div class="info-row price-row">
                   <span class="info-label">总价:</span>
                   <span class="price-value">¥{{ order.totalAmount }}</span>
                 </div>
-                <div v-if="order.incomeAmount" class="info-row income-row">
+                <div v-if="order.expectedIncomeAmount" class="info-row income-row">
                   <span class="info-label">预计收入:</span>
-                  <span class="income-value">¥{{ order.incomeAmount }}</span>
+                  <span class="income-value">¥{{ order.expectedIncomeAmount }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">预约:</span>
-                  <span class="info-value">{{ formatDate(order.scheduledTime) }}</span>
+                  <span class="info-value">{{ formatDate(order.scheduledTime) || '未设置' }}</span>
+                </div>
+                <div v-if="order.startedAt" class="info-row">
+                  <span class="info-label">开始:</span>
+                  <span class="info-value">{{ formatDate(order.startedAt) }}</span>
+                </div>
+                <div v-if="order.completedAt" class="info-row">
+                  <span class="info-label">完成:</span>
+                  <span class="info-value">{{ formatDate(order.completedAt) }}</span>
+                </div>
+                <div v-if="order.actualHours && order.status === 4" class="info-row">
+                  <span class="info-label">实际时长:</span>
+                  <span class="info-value actual-hours">{{ formatHoursToHM(order.actualHours) }}</span>
+                </div>
+                <div v-if="order.status === 4 && order.actualIncomeAmount" class="info-row actual-income-row">
+                  <span class="info-label">实际收入:</span>
+                  <span class="actual-income-value">¥{{ order.actualIncomeAmount }}</span>
                 </div>
                 
                 <div v-if="order.status === 3" class="service-timer">
@@ -173,6 +228,14 @@
                   <!-- 服务中状态 - 当前用户未完成，另一人已完成：可以完成（最后一人） -->
                   <el-button v-if="order.status === 3 && !order.currentUserCompleted && order.otherPlayerCompleted" type="warning" size="default" @click="handleComplete(order)">
                     <el-icon><CircleCheck /></el-icon>完成订单
+                  </el-button>
+                  <!-- 暂存按钮 - 已接单(1或2)或服务中(3)时可暂存 -->
+                  <el-button v-if="(order.status === 1 || order.status === 2 || order.status === 3) && order.currentUserAccepted" type="info" size="default" @click="handlePause(order)">
+                    <el-icon><VideoPause /></el-icon>暂存
+                  </el-button>
+                  <!-- 恢复按钮 - 暂存状态时可恢复 -->
+                  <el-button v-if="order.status === 6" type="success" size="default" @click="handleResume(order)">
+                    <el-icon><RefreshRight /></el-icon>恢复订单
                   </el-button>
                 </div>
               </div>
@@ -216,14 +279,19 @@
           <el-table-column label="时长/价格" width="140">
             <template #default="{ row }">
               <div class="time-price">
-                <div class="time">{{ row.serviceHours }}h</div>
+                <div class="time">{{ formatHoursToHM(row.serviceHours) }}</div>
                 <div class="price">¥{{ row.pricePerHour }}/h</div>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="金额" width="120">
+          <el-table-column label="预计金额" width="150">
             <template #default="{ row }">
-              <span class="total-amount">¥{{ row.totalAmount }}</span>
+              <div class="amount-cell">
+                <span class="total-amount">¥{{ row.totalAmount }}</span>
+                <span v-if="row.status === 4 && row.actualHours && row.actualHours > row.serviceHours && row.actualTotalAmount" class="actual-amount-tag">
+                  (实: ¥{{ row.actualTotalAmount }})
+                </span>
+              </div>
             </template>
           </el-table-column>
           <el-table-column prop="status" label="状态" width="110">
@@ -260,7 +328,7 @@
               <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="280" fixed="right">
+          <el-table-column label="操作" width="400" fixed="right">
             <template #default="{ row }">
               <div class="action-group">
                 <el-button
@@ -269,6 +337,14 @@
                   @click="handleDetail(row)"
                 >
                   <el-icon><View /></el-icon>详情
+                </el-button>
+                <el-button
+                  v-if="(isAdmin || isCustomerService) && row.status !== 5"
+                  type="primary"
+                  size="small"
+                  @click="handleEdit(row)"
+                >
+                  <el-icon><Edit /></el-icon>编辑
                 </el-button>
                 <el-button
                   v-if="(isAdmin || isCustomerService) && row.status === 0"
@@ -285,6 +361,22 @@
                   @click="handleAssign(row)"
                 >
                   <el-icon><RefreshRight /></el-icon>改派
+                </el-button>
+                <el-button
+                  v-if="(isAdmin || isCustomerService) && (row.status === 0 || row.status === 3)"
+                  type="info"
+                  size="small"
+                  @click="handlePause(row)"
+                >
+                  <el-icon><VideoPause /></el-icon>暂存
+                </el-button>
+                <el-button
+                  v-if="(isAdmin || isCustomerService) && row.status === 6"
+                  type="success"
+                  size="small"
+                  @click="handleResume(row)"
+                >
+                  <el-icon><RefreshRight /></el-icon>恢复
                 </el-button>
                 <el-button
                   v-if="(isAdmin || isCustomerService) && row.status !== 4 && row.status !== 5"
@@ -322,21 +414,33 @@
           </el-radio-group>
         </el-form-item>
         <template v-if="createForm.customer_type === 'REGULAR'">
-          <el-form-item label="选择老板" prop="boss_id">
-            <el-select 
-              v-model="createForm.boss_id" 
-              placeholder="请选择老板" 
-              style="width: 100%" 
-              filterable
-              @change="handleBossChange"
+          <el-form-item label="老板名字" prop="boss_info">
+            <el-autocomplete
+              v-model="createForm.boss_info"
+              :fetch-suggestions="queryBossSuggestions"
+              placeholder=""
+              style="width: 100%"
+              @select="handleBossSelect"
+              @clear="handleBossClear"
+              @input="handleBossInput"
+              clearable
             >
-              <el-option
-                v-for="boss in enabledBosses"
-                :key="boss.id"
-                :label="boss.name + ' (余额: ¥' + boss.balance + ' | VIP' + boss.vipLevel + ')'"
-                :value="boss.id"
-              />
-            </el-select>
+              <template #default="{ item }">
+                <div class="boss-suggestion-item">
+                  <span class="boss-suggestion-name">
+                    <span v-if="item.bossNo" class="boss-suggestion-no">{{ item.bossNo }}</span>
+                    {{ item.name }}
+                  </span>
+                  <span class="boss-suggestion-info">
+                    <el-tag size="small" type="warning">VIP{{ item.vipLevel }}</el-tag>
+                    <span class="boss-suggestion-balance">余额: ¥{{ item.balance }}</span>
+                  </span>
+                </div>
+              </template>
+            </el-autocomplete>
+            <div v-if="!selectedBoss && createForm.boss_info && createForm.boss_info.trim()" class="boss-match-info">
+              <el-tag type="info" size="small">未匹配到已有老板，将自动创建新老板</el-tag>
+            </div>
           </el-form-item>
           <el-form-item v-if="selectedBoss" label="VIP折扣">
             <div class="vip-info">
@@ -347,7 +451,7 @@
             </div>
           </el-form-item>
         </template>
-        <el-form-item label="老板名字" prop="boss_info">
+        <el-form-item v-if="createForm.customer_type === 'SCATTER'" label="老板名字" prop="boss_info">
           <el-input v-model="createForm.boss_info" placeholder="请输入老板名字" />
         </el-form-item>
         <el-form-item label="服务内容" prop="service_type">
@@ -358,6 +462,16 @@
         </el-form-item>
         <!-- 陪玩单选项 -->
         <template v-if="createForm.service_type === 'peiwand'">
+          <el-form-item label="陪玩人数" prop="player_count">
+            <el-radio-group v-model="createForm.player_count">
+              <el-radio-button label="single">单人</el-radio-button>
+              <el-radio-button label="double">双人</el-radio-button>
+            </el-radio-group>
+            <div class="player-count-tip">
+              <el-icon><InfoFilled /></el-icon>
+              <span>选择双人将自动创建两份相同的订单，分别派送两位同等级陪玩师</span>
+            </div>
+          </el-form-item>
           <el-form-item label="陪玩等级" prop="player_level">
             <el-select v-model="createForm.player_level" placeholder="请选择陪玩等级" style="width: 100%" @change="handleLevelChange">
               <el-option
@@ -379,13 +493,16 @@
             </el-select>
           </el-form-item>
           <el-form-item label="服务时长" prop="service_hours">
-            <el-input-number v-model="createForm.service_hours" :min="0.5" :max="24" :step="0.5" style="width: 100%" @change="calculateTotalPrice" />
+            <div class="duration-input-group">
+              <el-input-number v-model="createForm.service_hours" :min="0" :max="23" :step="1" style="width: 120px" @change="calculateTotalPrice" />
+              <span class="duration-unit">小时</span>
+              <el-input-number v-model="createForm.service_minutes" :min="0" :max="59" :step="15" style="width: 120px" @change="calculateTotalPrice" />
+              <span class="duration-unit">分钟</span>
+              <span class="duration-total">= {{ formatDuration(createForm.service_hours, createForm.service_minutes) }}</span>
+            </div>
           </el-form-item>
           <el-form-item label="单价">
             <div class="price-display">¥{{ createForm.price_per_hour }}/h</div>
-          </el-form-item>
-          <el-form-item label="原价">
-            <div class="original-price">¥{{ calculatedOriginalPrice.toFixed(2) }}</div>
           </el-form-item>
           <el-form-item v-if="createForm.customer_type === 'REGULAR' && selectedBoss && getVipDiscount(selectedBoss.vipLevel) < 1" label="折扣后">
             <div class="discounted-price">¥{{ calculatedDiscountedPrice.toFixed(2) }}</div>
@@ -394,7 +511,7 @@
           <el-form-item label="总价" prop="manual_total_amount">
             <el-input-number v-model="createForm.manual_total_amount" :min="1" :max="10000" :precision="2" style="width: 100%" />
             <div class="auto-price-tip">
-              自动计算: ¥{{ (createForm.service_hours * createForm.price_per_hour).toFixed(2) }}
+              自动计算: ¥{{ calculatedServicePrice.toFixed(2) }}
               <template v-if="createForm.customer_type === 'REGULAR' && selectedBoss && getVipDiscount(selectedBoss.vipLevel) < 1">
                 × {{ getDiscountText(selectedBoss.vipLevel) }} = ¥{{ calculatedDiscountedPrice.toFixed(2) }}
               </template>
@@ -429,14 +546,21 @@
             <el-input-number v-model="createForm.total_amount" :min="1" :max="10000" :precision="2" style="width: 100%" />
           </el-form-item>
         </template>
-        <el-form-item label="预约时间" prop="scheduled_time">
-          <el-date-picker
-            v-model="createForm.scheduled_time"
-            type="datetime"
-            placeholder="选择预约时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 100%"
-          />
+        <el-form-item label="预约时间">
+          <div class="scheduled-time-selectors">
+            <el-select v-model="createForm.scheduled_month" placeholder="月" style="width: 80px" @change="updateScheduledTime">
+              <el-option v-for="m in 12" :key="m" :label="m + '月'" :value="m" />
+            </el-select>
+            <el-select v-model="createForm.scheduled_day" placeholder="日" style="width: 80px" @change="updateScheduledTime">
+              <el-option v-for="d in getDaysInMonth" :key="d" :label="d + '日'" :value="d" />
+            </el-select>
+            <el-select v-model="createForm.scheduled_hour" placeholder="时" style="width: 80px" @change="updateScheduledTime">
+              <el-option v-for="h in 24" :key="h" :label="h - 1 + '时'" :value="h - 1" />
+            </el-select>
+            <el-select v-model="createForm.scheduled_minute" placeholder="分" style="width: 80px" @change="updateScheduledTime">
+              <el-option v-for="min in 12" :key="min" :label="(min - 1) * 5 + '分'" :value="(min - 1) * 5" />
+            </el-select>
+          </div>
         </el-form-item>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="createForm.remark" type="textarea" :rows="2" placeholder="可选" />
@@ -449,32 +573,76 @@
     </el-dialog>
 
     <!-- 派送订单对话框 -->
-    <el-dialog v-model="assignDialogVisible" title="派送订单" width="550px" class="order-dialog">
+    <el-dialog v-model="assignDialogVisible" title="派送订单" width="600px" class="order-dialog">
       <el-form label-width="100px">
         <el-form-item label="订单类型">
           <el-tag v-if="currentOrder?.playerCount === 'DOUBLE' || currentOrder?.playerCount === 'double'" type="danger" size="large">双人订单</el-tag>
           <el-tag v-else type="info" size="large">单人订单</el-tag>
         </el-form-item>
+        <el-form-item label="筛选条件">
+          <div class="assign-filters">
+            <el-select v-model="assignFilter.level" placeholder="全部等级" clearable style="width: 140px" @change="filterAvailablePlayers">
+              <el-option
+                v-for="lvl in assignFilterLevels"
+                :key="lvl"
+                :label="lvl"
+                :value="lvl"
+              />
+            </el-select>
+            <el-select v-model="assignFilter.status" placeholder="全部状态" clearable style="width: 140px" @change="filterAvailablePlayers">
+              <el-option label="空闲" value="idle" />
+              <el-option label="服务中" value="busy" />
+            </el-select>
+          </div>
+        </el-form-item>
         <el-form-item label="陪玩师1">
           <el-select v-model="assignForm.player_id" placeholder="请选择陪玩师1" style="width: 100%" filterable>
             <el-option
-              v-for="player in availablePlayers"
+              v-for="player in filteredPlayers"
               :key="player.id"
-              :label="player.nickname + ' (等级: ' + player.level + ' | ¥' + player.pricePerHour + '/h | 进行中: ' + player.activeOrdersCount + ')'"
+              :label="(player.playerNo ? player.playerNo + ' ' : '') + player.nickname + ' (等级: ' + player.level + ' | ¥' + player.pricePerHour + '/h | 进行中: ' + player.activeOrdersCount + ')'"
               :value="player.id"
               :disabled="player.id === assignForm.player_id2"
-            />
+            >
+              <div class="player-option">
+                <span class="player-option-name">
+                  <span v-if="player.playerNo" class="player-option-no">{{ player.playerNo }}</span>
+                  {{ player.nickname }}
+                </span>
+                <span class="player-option-tags">
+                  <el-tag size="small" :type="getLevelTagType(player.level)">{{ player.level }}</el-tag>
+                  <el-tag size="small" type="info">¥{{ player.pricePerHour }}/h</el-tag>
+                  <el-tag size="small" :type="player.activeOrdersCount === 0 ? 'success' : 'warning'">
+                    {{ player.activeOrdersCount === 0 ? '空闲' : '进行中 ' + player.activeOrdersCount }}
+                  </el-tag>
+                </span>
+              </div>
+            </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="陪玩师2" v-if="currentOrder?.playerCount === 'DOUBLE' || currentOrder?.playerCount === 'double'">
           <el-select v-model="assignForm.player_id2" placeholder="请选择陪玩师2" style="width: 100%" filterable>
             <el-option
-              v-for="player in availablePlayers"
+              v-for="player in filteredPlayers"
               :key="player.id"
-              :label="player.nickname + ' (等级: ' + player.level + ' | ¥' + player.pricePerHour + '/h | 进行中: ' + player.activeOrdersCount + ')'"
+              :label="(player.playerNo ? player.playerNo + ' ' : '') + player.nickname + ' (等级: ' + player.level + ' | ¥' + player.pricePerHour + '/h | 进行中: ' + player.activeOrdersCount + ')'"
               :value="player.id"
               :disabled="player.id === assignForm.player_id"
-            />
+            >
+              <div class="player-option">
+                <span class="player-option-name">
+                  <span v-if="player.playerNo" class="player-option-no">{{ player.playerNo }}</span>
+                  {{ player.nickname }}
+                </span>
+                <span class="player-option-tags">
+                  <el-tag size="small" :type="getLevelTagType(player.level)">{{ player.level }}</el-tag>
+                  <el-tag size="small" type="info">¥{{ player.pricePerHour }}/h</el-tag>
+                  <el-tag size="small" :type="player.activeOrdersCount === 0 ? 'success' : 'warning'">
+                    {{ player.activeOrdersCount === 0 ? '空闲' : '进行中 ' + player.activeOrdersCount }}
+                  </el-tag>
+                </span>
+              </div>
+            </el-option>
           </el-select>
         </el-form-item>
       </el-form>
@@ -485,10 +653,16 @@
     </el-dialog>
 
     <!-- 完成订单对话框 -->
-    <el-dialog v-model="completeDialogVisible" title="完成订单" width="680px" class="order-dialog complete-order-dialog">
+    <el-dialog v-model="completeDialogVisible" title="完成订单" width="680px" class="order-dialog complete-order-dialog" @opened="handleCompleteDialogOpen" @close="handleCompleteDialogClose">
       <el-form :model="completeForm" :rules="completeRules" ref="completeFormRef" label-width="100px">
-        <el-form-item label="实际时长" prop="actual_hours">
-          <el-input-number v-model="completeForm.actual_hours" :min="0.5" :max="24" :step="0.5" style="width: 100%" />
+        <el-form-item v-if="currentOrder?.orderType !== 'huhang'" label="实际时长" prop="actual_hours">
+          <div class="duration-input-group">
+            <el-input-number v-model="completeForm.actual_hours" :min="0" :max="23" :step="1" style="width: 120px" />
+            <span class="duration-unit">小时</span>
+            <el-input-number v-model="completeForm.actual_minutes" :min="0" :max="59" :step="1" style="width: 120px" />
+            <span class="duration-unit">分钟</span>
+            <span class="duration-total">= {{ formatDuration(completeForm.actual_hours, completeForm.actual_minutes) }}</span>
+          </div>
         </el-form-item>
         
         <!-- 截图上传区域 -->
@@ -498,104 +672,203 @@
               <el-icon><Picture /></el-icon>
               <span>服务截图</span>
             </div>
-            <el-tag type="danger" size="small" effect="light">必填</el-tag>
+            <el-tag type="info" size="small" effect="light">支持复制粘贴上传</el-tag>
           </div>
           
           <div class="screenshot-container">
             <!-- 开始截图 -->
-            <div class="screenshot-card">
+            <div class="screenshot-card"
+                 :class="{ active: activeUploadCard === 'start' }"
+                 tabindex="0"
+                 ref="startCardRef"
+                 @mouseenter="activeUploadCard = 'start'"
+                 @dragover.prevent
+                 @drop.prevent="handleDrop($event, 'start')">
               <div class="card-header">
                 <span class="card-title">开始截图</span>
                 <span class="card-badge required">*</span>
               </div>
-              <el-upload
-                class="screenshot-uploader"
-                action="/api/upload"
-                :headers="uploadHeaders"
-                :show-file-list="false"
-                :on-success="handleStartScreenshotSuccess"
-                :on-error="handleScreenshotError"
-                accept="image/*"
-              >
-                <div v-if="completeForm.start_screenshot_url" class="screenshot-preview-wrapper">
-                  <img :src="completeForm.start_screenshot_url" class="screenshot-preview" />
-                  <div class="screenshot-overlay">
+              <div class="upload-area">
+                <div v-if="completeForm.start_screenshot_preview || completeForm.start_screenshot_url" class="screenshot-preview-wrapper">
+                  <img :src="completeForm.start_screenshot_preview || completeForm.start_screenshot_url" class="screenshot-preview" @click="triggerUpload('start')" />
+                  <button class="delete-btn" @click.stop="deleteScreenshot('start')" title="删除截图">
+                    <el-icon><Close /></el-icon>
+                  </button>
+                  <div class="screenshot-overlay" @click="triggerUpload('start')">
                     <el-icon class="overlay-icon"><RefreshRight /></el-icon>
-                    <span class="overlay-text">更换</span>
+                    <span class="overlay-text">点击更换</span>
                   </div>
                 </div>
                 <div v-else class="upload-placeholder">
                   <div class="upload-icon-box">
                     <el-icon class="upload-icon"><Upload /></el-icon>
                   </div>
-                  <div class="upload-text">上传开始截图</div>
-                  <div class="upload-hint">支持 JPG、PNG</div>
+                  <div class="upload-hint">按 Ctrl+V 粘贴截图</div>
                 </div>
-              </el-upload>
+                <input type="file" ref="startScreenshotInput" style="display: none" accept="image/*" @change="handleFileSelect($event, 'start')" />
+              </div>
               <div class="card-footer">
-                <div v-if="completeForm.start_screenshot_url" class="status-badge success">
+                <div v-if="completeForm.start_screenshot_preview || completeForm.start_screenshot_url" class="status-badge success">
                   <el-icon class="status-icon"><CircleCheck /></el-icon>
-                  <span>已上传</span>
+                  <span>已选择</span>
                 </div>
                 <div v-else class="status-badge pending">
                   <el-icon class="status-icon"><Clock /></el-icon>
-                  <span>等待上传</span>
+                  <span>等待选择</span>
                 </div>
               </div>
             </div>
-            
+
             <!-- 结束截图 -->
-            <div class="screenshot-card">
+            <div class="screenshot-card"
+                 :class="{ active: activeUploadCard === 'end' }"
+                 tabindex="0"
+                 ref="endCardRef"
+                 @mouseenter="activeUploadCard = 'end'"
+                 @dragover.prevent
+                 @drop.prevent="handleDrop($event, 'end')">
               <div class="card-header">
                 <span class="card-title">结束截图</span>
                 <span class="card-badge required">*</span>
               </div>
-              <el-upload
-                class="screenshot-uploader"
-                action="/api/upload"
-                :headers="uploadHeaders"
-                :show-file-list="false"
-                :on-success="handleEndScreenshotSuccess"
-                :on-error="handleScreenshotError"
-                accept="image/*"
-              >
-                <div v-if="completeForm.end_screenshot_url" class="screenshot-preview-wrapper">
-                  <img :src="completeForm.end_screenshot_url" class="screenshot-preview" />
-                  <div class="screenshot-overlay">
+              <div class="upload-area">
+                <div v-if="completeForm.end_screenshot_preview || completeForm.end_screenshot_url" class="screenshot-preview-wrapper">
+                  <img :src="completeForm.end_screenshot_preview || completeForm.end_screenshot_url" class="screenshot-preview" @click="triggerUpload('end')" />
+                  <button class="delete-btn" @click.stop="deleteScreenshot('end')" title="删除截图">
+                    <el-icon><Close /></el-icon>
+                  </button>
+                  <div class="screenshot-overlay" @click="triggerUpload('end')">
                     <el-icon class="overlay-icon"><RefreshRight /></el-icon>
-                    <span class="overlay-text">更换</span>
+                    <span class="overlay-text">点击更换</span>
                   </div>
                 </div>
                 <div v-else class="upload-placeholder">
                   <div class="upload-icon-box">
                     <el-icon class="upload-icon"><Upload /></el-icon>
                   </div>
-                  <div class="upload-text">上传结束截图</div>
-                  <div class="upload-hint">支持 JPG、PNG</div>
+                  <div class="upload-hint">按 Ctrl+V 粘贴截图</div>
                 </div>
-              </el-upload>
+                <input type="file" ref="endScreenshotInput" style="display: none" accept="image/*" @change="handleFileSelect($event, 'end')" />
+              </div>
               <div class="card-footer">
-                <div v-if="completeForm.end_screenshot_url" class="status-badge success">
+                <div v-if="completeForm.end_screenshot_preview || completeForm.end_screenshot_url" class="status-badge success">
                   <el-icon class="status-icon"><CircleCheck /></el-icon>
-                  <span>已上传</span>
+                  <span>已选择</span>
                 </div>
                 <div v-else class="status-badge pending">
                   <el-icon class="status-icon"><Clock /></el-icon>
-                  <span>等待上传</span>
+                  <span>等待选择</span>
                 </div>
               </div>
             </div>
           </div>
-          
+
           <div class="screenshot-hint">
             <el-icon><InfoFilled /></el-icon>
-            <span>请上传游戏对局的开始和结束截图，用于订单审核</span>
+            <span>鼠标悬停在对应卡片上，按 Ctrl+V 粘贴截图，确认完成后才上传</span>
           </div>
         </div>
       </el-form>
       <template #footer>
         <el-button @click="completeDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitComplete" :loading="completing">确认完成</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑订单对话框 -->
+    <el-dialog v-model="editDialogVisible" title="编辑订单" width="600px" class="order-dialog">
+      <el-form :model="editForm" :rules="editRules" ref="editFormRef" label-width="100px" class="order-form">
+        <el-form-item label="订单号">
+          <span class="order-no-display">{{ currentOrder?.orderNo }}</span>
+        </el-form-item>
+        <el-form-item label="客户类型" prop="customer_type">
+          <el-radio-group v-model="editForm.customer_type" @change="handleEditCustomerTypeChange">
+            <el-radio-button label="SCATTER">散客</el-radio-button>
+            <el-radio-button label="REGULAR">固定客</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <template v-if="editForm.customer_type === 'REGULAR'">
+          <el-form-item label="老板名字" prop="boss_info">
+            <el-autocomplete
+              v-model="editForm.boss_info"
+              :fetch-suggestions="queryBossSuggestions"
+              placeholder=""
+              style="width: 100%"
+              @select="(item) => handleEditBossSelect(item)"
+              @clear="handleEditBossClear"
+              @input="handleEditBossInput"
+              clearable
+            >
+              <template #default="{ item }">
+                <div class="boss-suggestion-item">
+                  <span class="boss-suggestion-name">
+                    <span v-if="item.bossNo" class="boss-suggestion-no">{{ item.bossNo }}</span>
+                    {{ item.name }}
+                  </span>
+                  <span class="boss-suggestion-info">
+                    <el-tag size="small" type="warning">VIP{{ item.vipLevel }}</el-tag>
+                    <span class="boss-suggestion-balance">余额: ¥{{ item.balance }}</span>
+                  </span>
+                </div>
+              </template>
+            </el-autocomplete>
+            <div v-if="!selectedEditBoss && editForm.boss_info && editForm.boss_info.trim()" class="boss-match-info">
+              <el-tag type="info" size="small">未匹配到已有老板，将自动创建新老板</el-tag>
+            </div>
+            </el-form-item>
+            <el-form-item v-if="selectedEditBoss" label="VIP折扣">
+            <div class="vip-info">
+              <el-tag type="warning">VIP{{ selectedEditBoss.vipLevel }}</el-tag>
+              <span class="discount-text">{{ getDiscountText(selectedEditBoss.vipLevel) }}</span>
+              <span class="discount-rate">({{ getDiscountRateText(selectedEditBoss.vipLevel) }})</span>
+              <span class="balance-text">预存余额: ¥{{ selectedEditBoss.balance }}</span>
+            </div>
+          </el-form-item>
+        </template>
+        <el-form-item v-if="editForm.customer_type === 'SCATTER'" label="老板名字" prop="boss_info">
+          <el-input v-model="editForm.boss_info" placeholder="请输入老板名字" />
+        </el-form-item>
+        <el-form-item label="服务内容" prop="service_content">
+          <el-input v-model="editForm.service_content" placeholder="请输入服务内容" />
+        </el-form-item>
+        <el-form-item label="服务时长" prop="service_hours">
+          <el-input-number v-model="editForm.service_hours" :min="0.5" :max="24" :step="0.5" style="width: 100%" @change="calculateEditTotalPrice" />
+        </el-form-item>
+        <el-form-item label="单价" prop="price_per_hour">
+          <el-input-number v-model="editForm.price_per_hour" :min="1" :max="1000" :precision="2" style="width: 100%" @change="calculateEditTotalPrice" />
+        </el-form-item>
+        <el-form-item label="原价">
+          <div class="original-price">¥{{ editCalculatedOriginalPrice.toFixed(2) }}</div>
+        </el-form-item>
+        <el-form-item v-if="editForm.customer_type === 'REGULAR' && selectedEditBoss && getVipDiscount(selectedEditBoss.vipLevel) < 1" label="折扣后">
+          <div class="discounted-price">¥{{ editCalculatedDiscountedPrice.toFixed(2) }}</div>
+          <div class="discount-info">{{ getDiscountText(selectedEditBoss.vipLevel) }} 优惠 ¥{{ (editCalculatedOriginalPrice - editCalculatedDiscountedPrice).toFixed(2) }}</div>
+        </el-form-item>
+        <el-form-item label="总价" prop="total_amount">
+          <el-input-number v-model="editForm.total_amount" :min="1" :max="10000" :precision="2" style="width: 100%" />
+        </el-form-item>
+        <el-form-item v-if="editForm.customer_type === 'REGULAR' && selectedEditBoss && selectedEditBoss.balance > 0" label="使用余额">
+          <el-switch v-model="editForm.use_balance" active-text="是" inactive-text="否" />
+          <div v-if="editForm.use_balance && editForm.total_amount > 0" class="balance-deduct-info">
+            将从预存余额中扣除 ¥{{ Math.min(selectedEditBoss.balance, editForm.total_amount).toFixed(2) }}
+          </div>
+        </el-form-item>
+        <el-form-item label="预约时间" prop="scheduled_time">
+          <el-date-picker
+            v-model="editForm.scheduled_time"
+            type="datetime"
+            placeholder="选择预约时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="备注" prop="remark">
+          <el-input v-model="editForm.remark" type="textarea" :rows="2" placeholder="可选" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitEdit">保存修改</el-button>
       </template>
     </el-dialog>
 
@@ -620,6 +893,27 @@
       </template>
     </el-dialog>
 
+    <!-- 暂存订单对话框 -->
+    <el-dialog v-model="pauseDialogVisible" title="暂存订单" width="450px" class="order-dialog">
+      <el-form :model="pauseForm" :rules="pauseRules" ref="pauseFormRef" label-width="100px">
+        <el-form-item label="订单号">
+          <span class="order-no-display">{{ currentOrder?.orderNo }}</span>
+        </el-form-item>
+        <el-form-item label="暂存原因" prop="reason">
+          <el-input
+            v-model="pauseForm.reason"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入暂存原因"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="pauseDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitPause">确认暂存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 订单详情对话框 -->
     <el-dialog v-model="detailDialogVisible" title="订单详情" width="700px" class="order-dialog">
       <el-descriptions :column="2" border v-if="currentOrder">
@@ -639,24 +933,30 @@
         <!-- 单人订单显示 -->
         <template v-if="currentOrder.playerCount !== 'DOUBLE'">
           <el-descriptions-item label="服务内容" :span="2">{{ currentOrder.serviceContent }}</el-descriptions-item>
-          <el-descriptions-item label="服务时长">{{ currentOrder.serviceHours }} 小时</el-descriptions-item>
+          <el-descriptions-item label="服务时长">{{ formatHoursToHM(currentOrder.serviceHours) }}</el-descriptions-item>
           <el-descriptions-item label="单价">¥{{ currentOrder.pricePerHour }}/小时</el-descriptions-item>
-          <el-descriptions-item label="订单总价">
+          <el-descriptions-item label="订单预计总价">
             <span class="detail-price">¥{{ currentOrder.totalAmount }}</span>
           </el-descriptions-item>
-          <el-descriptions-item label="实际时长">{{ currentOrder.actualHours || '-' }} 小时</el-descriptions-item>
+          <el-descriptions-item label="实际时长">{{ currentOrder.actualHours ? formatHoursToHM(currentOrder.actualHours) : '-' }}</el-descriptions-item>
           <el-descriptions-item label="当前陪玩师">{{ currentOrder.currentPlayerNickname || '待分配' }}</el-descriptions-item>
+          <el-descriptions-item v-if="currentOrder.status === 4 && currentOrder.actualTotalAmount" label="订单实际总价">
+            <span class="detail-actual-price">¥{{ currentOrder.actualTotalAmount }}</span>
+          </el-descriptions-item>
         </template>
         
         <!-- 双人订单显示 -->
         <template v-if="currentOrder.playerCount === 'DOUBLE'">
           <el-descriptions-item label="服务项目" :span="2">{{ currentOrder.serviceContent }}</el-descriptions-item>
-          <el-descriptions-item label="预估时长">{{ currentOrder.serviceHours }} 小时</el-descriptions-item>
-          <el-descriptions-item label="订单总价">
+          <el-descriptions-item label="预估时长">{{ formatHoursToHM(currentOrder.serviceHours) }}</el-descriptions-item>
+          <el-descriptions-item label="订单预计总价">
             <span class="detail-price">¥{{ currentOrder.totalAmount }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="陪玩师1">{{ currentOrder.currentPlayerNickname || '待分配' }}</el-descriptions-item>
           <el-descriptions-item label="陪玩师2">{{ currentOrder.currentPlayer2Nickname || '待分配' }}</el-descriptions-item>
+          <el-descriptions-item v-if="currentOrder.status === 4 && currentOrder.actualTotalAmount" label="订单实际总价">
+            <span class="detail-actual-price">¥{{ currentOrder.actualTotalAmount }}</span>
+          </el-descriptions-item>
         </template>
         
         <el-descriptions-item label="创建人">{{ currentOrder.createdByNickname || '-' }}</el-descriptions-item>
@@ -684,7 +984,7 @@
                 </div>
                 <div class="session-detail">
                   <span class="session-label">服务时长:</span>
-                  <span>{{ session.actualHours ? session.actualHours + ' 小时' : '-' }}</span>
+                  <span>{{ session.actualHours ? formatHoursToHM(session.actualHours) : '-' }}</span>
                 </div>
               </div>
             </div>
@@ -734,12 +1034,12 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { getOrders, getOrderById, getMyInServiceOrders, createOrder, assignOrder, acceptOrder, completeOrder, cancelOrder, batchDeleteOrders } from '@/api/orders'
+import { getOrders, getOrderById, getMyInServiceOrders, createOrder, updateOrder, assignOrder, acceptOrder, completeOrder, cancelOrder, pauseOrder, resumeOrder, batchDeleteOrders } from '@/api/orders'
 import { getPlayers } from '@/api/users'
 import { getLevelPrices, getSystemOptions } from '@/api/system'
-import { getBosses, getVipLevels } from '@/api/boss'
+import { getBosses, getVipLevels, createBoss } from '@/api/boss'
 import dayjs from 'dayjs'
-import { Document, Plus, CircleCheck, CircleClose, Timer, Loading, Check, Position, RefreshRight, Calendar, View, User, Delete, Warning, Picture, InfoFilled, Upload, Clock } from '@element-plus/icons-vue'
+import { Document, Plus, CircleCheck, CircleClose, Timer, Loading, Check, Position, RefreshRight, Calendar, View, User, Delete, Warning, Picture, InfoFilled, Upload, Clock, Edit, Search, Close, VideoPause } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -755,6 +1055,7 @@ const total = ref(0)
 const statusFilter = ref('')
 const dateFilterType = ref('all')
 const dateRange = ref([])
+const searchKeyword = ref('')
 const availablePlayers = ref([])
 const levelPrices = ref([])
 const precautions = ref([])
@@ -773,9 +1074,21 @@ const selectedBoss = computed(() => {
   return bosses.value.find(boss => boss.id === createForm.boss_id)
 })
 
+// 计算服务时长（小时）
+const calculatedServiceHours = computed(() => {
+  const hours = createForm.service_hours || 0
+  const minutes = createForm.service_minutes || 0
+  return hours + minutes / 60
+})
+
+// 计算服务价格（基于时长）
+const calculatedServicePrice = computed(() => {
+  return calculatedServiceHours.value * createForm.price_per_hour
+})
+
 // 计算原价
 const calculatedOriginalPrice = computed(() => {
-  return createForm.service_hours * createForm.price_per_hour
+  return calculatedServicePrice.value
 })
 
 // 计算折扣后价格
@@ -788,10 +1101,34 @@ const calculatedDiscountedPrice = computed(() => {
   return original * discount
 })
 
+// 获取当前月份的天数
+const getDaysInMonth = computed(() => {
+  const month = createForm.scheduled_month
+  if (!month) return 31
+  const year = dayjs().year()
+  const daysInMonth = dayjs(`${year}-${month}`).daysInMonth()
+  return daysInMonth
+})
+
+// 更新预约时间
+const updateScheduledTime = () => {
+  if (createForm.scheduled_month && createForm.scheduled_day && createForm.scheduled_hour !== null) {
+    const year = dayjs().year()
+    const month = String(createForm.scheduled_month).padStart(2, '0')
+    const day = String(createForm.scheduled_day).padStart(2, '0')
+    const hour = String(createForm.scheduled_hour).padStart(2, '0')
+    const minute = String(createForm.scheduled_minute || 0).padStart(2, '0')
+    createForm.scheduled_time = `${year}-${month}-${day} ${hour}:${minute}:00`
+  } else {
+    createForm.scheduled_time = ''
+  }
+}
+
 const orderStats = ref({
   pending: 0,
   waiting: 0,
   inService: 0,
+  paused: 0,
   completed: 0,
   cancelled: 0
 })
@@ -814,19 +1151,23 @@ const createForm = reactive({
   service_content: '',
   player_count: 'single',
   service_hours: 1,
+  service_minutes: 0,
   price_per_hour: 50,
   total_amount: 50,
   manual_total_amount: 50,
   scheduled_time: '',
+  scheduled_month: null,
+  scheduled_day: null,
+  scheduled_hour: null,
+  scheduled_minute: null,
   remark: '',
-  // 客户类型和老板关联
   customer_type: 'SCATTER',
   boss_id: null,
   use_balance: false
 })
 
 const createRules = {
-  boss_info: [{ required: true, message: '请输入老板名字', trigger: 'blur' }],
+  boss_info: [{ required: true, message: '请输入老板名字', trigger: 'change' }],
   service_type: [{ required: true, message: '请选择服务类型', trigger: 'change' }],
   player_level: [{ required: true, message: '请选择陪玩等级', trigger: 'change' }],
   service_content: [{ required: true, message: '请输入服务项目', trigger: 'blur' }],
@@ -839,8 +1180,53 @@ const assignForm = reactive({
   player_id2: ''
 })
 
+const assignFilter = reactive({
+  level: '',
+  status: ''
+})
+
+const assignFilterLevels = computed(() => {
+  const levels = [...new Set(availablePlayers.value.map(p => p.level).filter(Boolean))]
+  return levels.sort()
+})
+
+const filteredPlayers = computed(() => {
+  let list = availablePlayers.value
+  if (assignFilter.level) {
+    list = list.filter(p => p.level === assignFilter.level)
+  }
+  if (assignFilter.status === 'idle') {
+    list = list.filter(p => !p.activeOrdersCount || p.activeOrdersCount === 0)
+  } else if (assignFilter.status === 'busy') {
+    list = list.filter(p => p.activeOrdersCount && p.activeOrdersCount > 0)
+  }
+  return list
+})
+
+const filterAvailablePlayers = () => {
+}
+
+const getLevelTagType = (level) => {
+  const types = {
+    '机密娱乐': '',
+    '绝密娱乐': 'success',
+    '机密技术': 'warning',
+    '机密金牌': 'danger',
+    '机密巅峰': ''
+  }
+  return types[level] || 'info'
+}
+
 const completeForm = reactive({
   actual_hours: 1,
+  actual_minutes: 0,
+  // 本地预览URL（用于显示）
+  start_screenshot_preview: '',
+  end_screenshot_preview: '',
+  // 本地文件对象（用于上传）
+  start_screenshot_file: null,
+  end_screenshot_file: null,
+  // 服务器返回的URL（上传成功后填充）
   start_screenshot_url: '',
   end_screenshot_url: ''
 })
@@ -852,7 +1238,12 @@ const completeRules = {
 }
 
 const completeFormRef = ref()
+const startScreenshotInput = ref()
+const endScreenshotInput = ref()
+const startCardRef = ref()
+const endCardRef = ref()
 const completing = ref(false)
+const activeUploadCard = ref(null)
 
 // 上传请求头，添加认证token
 const uploadHeaders = computed(() => {
@@ -870,6 +1261,57 @@ const cancelRules = {
   reason: [{ required: true, message: '请输入取消原因', trigger: 'blur' }]
 }
 
+const pauseDialogVisible = ref(false)
+const pauseFormRef = ref()
+const pauseForm = reactive({
+  reason: ''
+})
+
+const pauseRules = {
+  reason: [{ required: true, message: '请输入暂存原因', trigger: 'blur' }]
+}
+
+const editDialogVisible = ref(false)
+const editFormRef = ref()
+const editForm = reactive({
+  boss_info: '',
+  service_content: '',
+  service_hours: 1,
+  price_per_hour: 50,
+  total_amount: 50,
+  scheduled_time: '',
+  remark: '',
+  customer_type: 'SCATTER',
+  boss_id: null,
+  use_balance: false
+})
+
+const editRules = {
+  boss_info: [{ required: true, message: '请输入老板名字', trigger: 'change' }],
+  service_content: [{ required: true, message: '请输入服务内容', trigger: 'blur' }],
+  service_hours: [{ required: true, message: '请输入服务时长', trigger: 'blur' }],
+  price_per_hour: [{ required: true, message: '请输入单价', trigger: 'blur' }],
+  total_amount: [{ required: true, message: '请输入总价', trigger: 'blur' }]
+}
+
+const selectedEditBoss = computed(() => {
+  if (!editForm.boss_id) return null
+  return bosses.value.find(boss => boss.id === editForm.boss_id)
+})
+
+const editCalculatedOriginalPrice = computed(() => {
+  return editForm.service_hours * editForm.price_per_hour
+})
+
+const editCalculatedDiscountedPrice = computed(() => {
+  const original = editCalculatedOriginalPrice.value
+  if (editForm.customer_type !== 'REGULAR' || !selectedEditBoss.value) {
+    return original
+  }
+  const discount = getVipDiscount(selectedEditBoss.value.vipLevel)
+  return original * discount
+})
+
 const getStatusType = (status) => {
   const types = {
     0: 'info',    // PENDING_ASSIGN: 待分配
@@ -877,7 +1319,8 @@ const getStatusType = (status) => {
     2: 'warning', // PENDING_ACCEPT_2: 待接单2
     3: 'primary', // IN_SERVICE: 服务中
     4: 'success', // COMPLETED: 已完成
-    5: 'danger'   // CANCELLED: 已取消
+    5: 'danger',  // CANCELLED: 已取消
+    6: ''         // PAUSED: 暂存
   }
   return types[status] || 'info'
 }
@@ -889,7 +1332,8 @@ const getStatusText = (status) => {
     2: '待接单2',     // PENDING_ACCEPT_2
     3: '服务中',      // IN_SERVICE
     4: '已完成',      // COMPLETED
-    5: '已取消'       // CANCELLED
+    5: '已取消',      // CANCELLED
+    6: '暂存'         // PAUSED
   }
   return texts[status] || '未知'
 }
@@ -919,6 +1363,7 @@ const calculateStats = () => {
     pending: orders.value.filter(o => o.status === 0).length,
     waiting: orders.value.filter(o => o.status === 1 || o.status === 2).length,
     inService: orders.value.filter(o => o.status === 3).length,
+    paused: orders.value.filter(o => o.status === 6).length,
     completed: orders.value.filter(o => o.status === 4).length,
     cancelled: orders.value.filter(o => o.status === 5).length
   }
@@ -939,6 +1384,9 @@ const loadOrders = async () => {
     } else if (dateFilterType.value === 'dateRange' && dateRange.value && dateRange.value.length === 2) {
       params.startDate = dateRange.value[0]
       params.endDate = dateRange.value[1]
+    }
+    if (searchKeyword.value && searchKeyword.value.trim()) {
+      params.keyword = searchKeyword.value.trim()
     }
     const res = await getOrders(params)
     orders.value = Array.isArray(res.data) ? res.data : (res.data?.list || [])
@@ -965,6 +1413,17 @@ const handleDateFilterTypeChange = () => {
 }
 
 const handleDateRangeChange = () => {
+  page.value = 1
+  loadOrders()
+}
+
+const handleSearch = () => {
+  page.value = 1
+  loadOrders()
+}
+
+const handleClearSearch = () => {
+  searchKeyword.value = ''
   page.value = 1
   loadOrders()
 }
@@ -1054,23 +1513,53 @@ const getDiscountRateText = (vipLevel) => {
 // 客户类型改变处理
 const handleCustomerTypeChange = () => {
   createForm.boss_id = null
+  createForm.boss_info = ''
   createForm.use_balance = false
   if (createForm.customer_type === 'SCATTER') {
-    // 散客时重置总价为原价
     calculateTotalPrice()
   }
 }
 
-// 老板选择改变处理
-const handleBossChange = () => {
-  if (selectedBoss.value) {
-    // 自动填充老板名字
-    createForm.boss_info = selectedBoss.value.name
-    // 应用VIP折扣到总价
-    const discountedPrice = calculatedDiscountedPrice.value
-    createForm.manual_total_amount = Number(discountedPrice.toFixed(2))
-    // 如果余额充足，默认使用余额
-    createForm.use_balance = selectedBoss.value.balance > 0
+const queryBossSuggestions = (queryString, cb) => {
+  const results = queryString
+    ? enabledBosses.value.filter(boss =>
+        boss.name.toLowerCase().includes(queryString.toLowerCase())
+      )
+    : enabledBosses.value
+  cb(results.map(boss => ({ ...boss, value: boss.name })))
+}
+
+const handleBossSelect = (item) => {
+  createForm.boss_id = item.id
+  createForm.boss_info = item.name
+  if (item.balance > 0) {
+    createForm.use_balance = true
+  }
+  const discountedPrice = calculatedDiscountedPrice.value
+  createForm.manual_total_amount = Number(discountedPrice.toFixed(2))
+}
+
+const handleBossClear = () => {
+  createForm.boss_id = null
+  createForm.use_balance = false
+}
+
+const handleBossInput = (val) => {
+  if (createForm.boss_id) {
+    const boss = bosses.value.find(b => b.id === createForm.boss_id)
+    if (!boss || boss.name !== val) {
+      createForm.boss_id = null
+      createForm.use_balance = false
+    }
+  }
+  if (!createForm.boss_id && val && val.trim()) {
+    const exactMatch = enabledBosses.value.find(b => b.name === val.trim())
+    if (exactMatch) {
+      createForm.boss_id = exactMatch.id
+      if (exactMatch.balance > 0) {
+        createForm.use_balance = true
+      }
+    }
   }
 }
 
@@ -1098,7 +1587,10 @@ const handleLevelChange = () => {
 
 // 计算总价
 const calculateTotalPrice = () => {
-  // 价格自动根据等级和时长计算，无需额外操作
+  const hours = createForm.service_hours || 0
+  const minutes = createForm.service_minutes || 0
+  const totalHours = hours + minutes / 60
+  createForm.manual_total_amount = Number((totalHours * createForm.price_per_hour).toFixed(2))
 }
 
 const submitCreate = async () => {
@@ -1106,14 +1598,30 @@ const submitCreate = async () => {
   if (!valid) return
 
   try {
+    let bossId = null
+    if (createForm.customer_type === 'REGULAR') {
+      if (createForm.boss_id) {
+        bossId = createForm.boss_id
+      } else if (createForm.boss_info && createForm.boss_info.trim()) {
+        const res = await createBoss({
+          name: createForm.boss_info.trim(),
+          contactType: 'WECHAT',
+          contactValue: '',
+          customerType: 'REGULAR',
+          vipLevel: 0
+        })
+        bossId = res.data?.id
+        await loadBosses()
+      }
+    }
+
     let orderData = {
       bossInfo: createForm.boss_info,
       scheduledTime: createForm.scheduled_time ? dayjs(createForm.scheduled_time).format('YYYY-MM-DDTHH:mm:ss') : null,
       remark: createForm.remark,
       orderType: createForm.service_type,
-      // 客户类型和老板关联
       customerType: createForm.customer_type,
-      bossId: createForm.customer_type === 'REGULAR' ? createForm.boss_id : null,
+      bossId: bossId,
       useBalance: createForm.customer_type === 'REGULAR' ? createForm.use_balance : false
     }
 
@@ -1121,7 +1629,9 @@ const submitCreate = async () => {
       // 陪玩单
       let precautionsText = createForm.precautions ? `【${createForm.precautions}】` : ''
       orderData.serviceContent = createForm.player_level + '陪玩' + precautionsText
-      orderData.serviceHours = createForm.service_hours
+      // 计算服务时长（小时+分钟转换为小时）
+      const totalHours = (createForm.service_hours || 0) + (createForm.service_minutes || 0) / 60
+      orderData.serviceHours = totalHours
       orderData.pricePerHour = createForm.price_per_hour
       // 计算原价和折扣
       const originalAmount = calculatedOriginalPrice.value
@@ -1143,20 +1653,37 @@ const submitCreate = async () => {
       orderData.playerCount = createForm.player_count
     }
 
-    await createOrder(orderData)
-    ElMessage.success('订单创建成功')
+    // 双人陪玩单：创建两份相同订单
+    const isDoublePeiwan = createForm.service_type === 'peiwand' && createForm.player_count === 'double'
+
+    if (isDoublePeiwan) {
+      // 创建第一份订单
+      await createOrder(orderData)
+      // 创建第二份相同订单
+      await createOrder({ ...orderData })
+      ElMessage.success('双人订单创建成功（已创建2份相同订单）')
+    } else {
+      await createOrder(orderData)
+      ElMessage.success('订单创建成功')
+    }
+
     createDialogVisible.value = false
     createFormRef.value?.resetFields()
     // 重置默认值
     createForm.service_type = 'peiwand'
     createForm.player_count = 'single'
     createForm.service_hours = 1
+    createForm.service_minutes = 0
     createForm.price_per_hour = 50
     createForm.total_amount = 50
     createForm.manual_total_amount = 50
     createForm.customer_type = 'SCATTER'
     createForm.boss_id = null
     createForm.use_balance = false
+    createForm.scheduled_month = null
+    createForm.scheduled_day = null
+    createForm.scheduled_hour = null
+    createForm.scheduled_minute = null
     loadOrders()
   } catch (error) {
     ElMessage.error('创建失败')
@@ -1169,6 +1696,8 @@ const handleAssign = async (row) => {
   availablePlayers.value = res.data?.list || res.data || []
   assignForm.player_id = ''
   assignForm.player_id2 = ''
+  assignFilter.level = ''
+  assignFilter.status = ''
   assignDialogVisible.value = true
 }
 
@@ -1246,55 +1775,237 @@ const handleAccept = async (row) => {
 
 const handleComplete = (row) => {
   currentOrder.value = row
-  completeForm.actual_hours = row.service_hours
+  completeForm.actual_hours = Math.floor(row.serviceHours)
+  completeForm.actual_minutes = Math.round((row.serviceHours - Math.floor(row.serviceHours)) * 60)
+  // 重置所有截图相关字段
+  completeForm.start_screenshot_preview = ''
+  completeForm.end_screenshot_preview = ''
+  completeForm.start_screenshot_file = null
+  completeForm.end_screenshot_file = null
   completeForm.start_screenshot_url = ''
   completeForm.end_screenshot_url = ''
   completeDialogVisible.value = true
 }
 
-const handleStartScreenshotSuccess = (response) => {
-  completeForm.start_screenshot_url = response.data
-  ElMessage.success('开始截图上传成功')
+const formatDuration = (hours, minutes) => {
+  const totalMinutes = (hours || 0) * 60 + (minutes || 0)
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  if (h === 0) {
+    return `${m}分钟`
+  } else if (m === 0) {
+    return `${h}小时`
+  } else {
+    return `${h}小时${m}分钟`
+  }
 }
 
-const handleEndScreenshotSuccess = (response) => {
-  completeForm.end_screenshot_url = response.data
-  ElMessage.success('结束截图上传成功')
+const formatHoursToHM = (hours) => {
+  if (!hours && hours !== 0) return '-'
+  const h = Math.floor(hours)
+  const m = Math.round((hours - h) * 60)
+  if (h === 0 && m === 0) return '0分钟'
+  if (h === 0) return `${m}分钟`
+  if (m === 0) return `${h}小时`
+  return `${h}小时${m}分钟`
 }
 
-const handleScreenshotError = () => {
-  ElMessage.error('截图上传失败，请重试')
+const handleCompleteDialogOpen = () => {
+  // 添加全局粘贴事件监听
+  document.addEventListener('paste', handleGlobalPaste)
+  // 默认聚焦到开始截图
+  activeUploadCard.value = 'start'
+}
+
+const handleCompleteDialogClose = () => {
+  // 移除全局粘贴事件监听
+  document.removeEventListener('paste', handleGlobalPaste)
+  activeUploadCard.value = null
+}
+
+const handleGlobalPaste = (event) => {
+  if (!completeDialogVisible.value) return
+
+  const items = event.clipboardData?.items
+  if (!items) return
+
+  for (let item of items) {
+    if (item.type.indexOf('image') !== -1) {
+      const file = item.getAsFile()
+      if (file) {
+        // 本地预览，不上传
+        const target = activeUploadCard.value || 'start'
+        const localUrl = URL.createObjectURL(file)
+        if (target === 'start') {
+          completeForm.start_screenshot_preview = localUrl
+          completeForm.start_screenshot_file = file
+        } else {
+          completeForm.end_screenshot_preview = localUrl
+          completeForm.end_screenshot_file = file
+        }
+      }
+      break
+    }
+  }
+}
+
+const selectCard = (type) => {
+  activeUploadCard.value = type
+  // 让卡片获得焦点
+  const cardRef = type === 'start' ? startCardRef.value : endCardRef.value
+  cardRef?.focus()
+}
+
+const handleDrop = (event, type) => {
+  const files = event.dataTransfer?.files
+  if (!files || files.length === 0) return
+
+  const file = files[0]
+  if (file.type.indexOf('image') !== -1) {
+    // 本地预览，不上传
+    const localUrl = URL.createObjectURL(file)
+    if (type === 'start') {
+      completeForm.start_screenshot_preview = localUrl
+      completeForm.start_screenshot_file = file
+    } else {
+      completeForm.end_screenshot_preview = localUrl
+      completeForm.end_screenshot_file = file
+    }
+  }
+}
+
+const triggerUpload = (type) => {
+  const input = type === 'start' ? startScreenshotInput.value : endScreenshotInput.value
+  input?.click()
+}
+
+const deleteScreenshot = (type) => {
+  if (type === 'start') {
+    // 释放本地预览URL
+    if (completeForm.start_screenshot_preview) {
+      URL.revokeObjectURL(completeForm.start_screenshot_preview)
+    }
+    completeForm.start_screenshot_preview = ''
+    completeForm.start_screenshot_file = null
+    completeForm.start_screenshot_url = ''
+  } else {
+    // 释放本地预览URL
+    if (completeForm.end_screenshot_preview) {
+      URL.revokeObjectURL(completeForm.end_screenshot_preview)
+    }
+    completeForm.end_screenshot_preview = ''
+    completeForm.end_screenshot_file = null
+    completeForm.end_screenshot_url = ''
+  }
+}
+
+const handleFileSelect = (event, type) => {
+  const file = event.target.files?.[0]
+  if (file && file.type.indexOf('image') !== -1) {
+    // 本地预览，不上传
+    const localUrl = URL.createObjectURL(file)
+    if (type === 'start') {
+      completeForm.start_screenshot_preview = localUrl
+      completeForm.start_screenshot_file = file
+    } else {
+      completeForm.end_screenshot_preview = localUrl
+      completeForm.end_screenshot_file = file
+    }
+  }
+  // 清空input，允许重复选择同一文件
+  event.target.value = ''
+}
+
+const uploadImage = async (file, type) => {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+      },
+      body: formData
+    })
+
+    const result = await response.json()
+
+    if (result.success !== false && result.data) {
+      if (type === 'start') {
+        completeForm.start_screenshot_url = result.data
+      } else {
+        completeForm.end_screenshot_url = result.data
+      }
+    } else {
+      ElMessage.error(result.message || '上传失败')
+    }
+  } catch (error) {
+    ElMessage.error('上传失败')
+  }
 }
 
 const submitComplete = async () => {
   const valid = await completeFormRef.value?.validate().catch(() => false)
   if (!valid) return
 
-  // 检查截图是否已上传
-  if (!completeForm.start_screenshot_url) {
-    ElMessage.error('请上传开始截图')
+  // 检查截图是否已选择（本地预览或已上传）
+  if (!completeForm.start_screenshot_preview && !completeForm.start_screenshot_url) {
+    ElMessage.error('请选择开始截图')
     return
   }
-  if (!completeForm.end_screenshot_url) {
-    ElMessage.error('请上传结束截图')
+  if (!completeForm.end_screenshot_preview && !completeForm.end_screenshot_url) {
+    ElMessage.error('请选择结束截图')
     return
   }
 
   completing.value = true
   try {
+    // 如果有本地文件，先上传
+    if (completeForm.start_screenshot_file) {
+      await uploadImage(completeForm.start_screenshot_file, 'start')
+    }
+    if (completeForm.end_screenshot_file) {
+      await uploadImage(completeForm.end_screenshot_file, 'end')
+    }
+
+    // 检查上传是否成功
+    if (!completeForm.start_screenshot_url || !completeForm.end_screenshot_url) {
+      ElMessage.error('截图上传失败，请重试')
+      return
+    }
+
     const payload = {
-      actualHours: completeForm.actual_hours || 0.5,
       startScreenshotUrl: completeForm.start_screenshot_url,
       endScreenshotUrl: completeForm.end_screenshot_url
+    }
+    if (currentOrder.value?.orderType !== 'huhang') {
+      const totalMinutes = (completeForm.actual_hours || 0) * 60 + (completeForm.actual_minutes || 0)
+      payload.actualHours = totalMinutes / 60
     }
     await completeOrder(currentOrder.value.id, payload)
     ElMessage.success('订单完成')
     completeDialogVisible.value = false
+    // 移除全局粘贴事件监听
+    document.removeEventListener('paste', handleGlobalPaste)
+    activeUploadCard.value = null
+    // 释放本地预览URL
+    if (completeForm.start_screenshot_preview) {
+      URL.revokeObjectURL(completeForm.start_screenshot_preview)
+    }
+    if (completeForm.end_screenshot_preview) {
+      URL.revokeObjectURL(completeForm.end_screenshot_preview)
+    }
+    // 重置表单
+    completeForm.start_screenshot_preview = ''
+    completeForm.end_screenshot_preview = ''
+    completeForm.start_screenshot_file = null
+    completeForm.end_screenshot_file = null
     completeForm.start_screenshot_url = ''
     completeForm.end_screenshot_url = ''
     loadOrders()
   } catch (error) {
-    ElMessage.error(error.message || '操作失败')
+    // 错误已在request.js中处理
   } finally {
     completing.value = false
   }
@@ -1368,6 +2079,162 @@ const submitCancel = async () => {
   }
 }
 
+const handlePause = (row) => {
+  currentOrder.value = row
+  pauseForm.reason = ''
+  pauseDialogVisible.value = true
+}
+
+const submitPause = async () => {
+  const valid = await pauseFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+
+  try {
+    await pauseOrder(currentOrder.value.id, { reason: pauseForm.reason })
+    ElMessage.success('订单已暂存')
+    pauseDialogVisible.value = false
+    loadOrders()
+  } catch (error) {
+    ElMessage.error('暂存失败')
+  }
+}
+
+const handleResume = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要恢复此订单吗？',
+      '恢复订单',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+    await resumeOrder(row.id)
+    ElMessage.success('订单已恢复')
+    loadOrders()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('恢复失败')
+    }
+  }
+}
+
+const handleEdit = (row) => {
+  currentOrder.value = row
+  editForm.boss_info = row.bossInfo
+  editForm.service_content = row.serviceContent
+  editForm.service_hours = row.serviceHours
+  editForm.price_per_hour = row.pricePerHour
+  editForm.total_amount = row.totalAmount
+  editForm.scheduled_time = row.scheduledTime ? dayjs(row.scheduledTime).format('YYYY-MM-DD HH:mm:ss') : ''
+  editForm.remark = row.remark || ''
+  editForm.customer_type = 'SCATTER'
+  editForm.boss_id = null
+  editForm.use_balance = false
+  editDialogVisible.value = true
+}
+
+const handleEditCustomerTypeChange = () => {
+  editForm.boss_id = null
+  editForm.boss_info = ''
+  editForm.use_balance = false
+  calculateEditTotalPrice()
+}
+
+const handleEditBossSelect = (item) => {
+  editForm.boss_id = item.id
+  editForm.boss_info = item.name
+  if (item.balance > 0) {
+    editForm.use_balance = true
+  }
+  const discountedPrice = editCalculatedDiscountedPrice.value
+  editForm.total_amount = Number(discountedPrice.toFixed(2))
+}
+
+const handleEditBossClear = () => {
+  editForm.boss_id = null
+  editForm.use_balance = false
+}
+
+const handleEditBossInput = (val) => {
+  if (editForm.boss_id) {
+    const boss = bosses.value.find(b => b.id === editForm.boss_id)
+    if (!boss || boss.name !== val) {
+      editForm.boss_id = null
+      editForm.use_balance = false
+    }
+  }
+  if (!editForm.boss_id && val && val.trim()) {
+    const exactMatch = enabledBosses.value.find(b => b.name === val.trim())
+    if (exactMatch) {
+      editForm.boss_id = exactMatch.id
+      if (exactMatch.balance > 0) {
+        editForm.use_balance = true
+      }
+    }
+  }
+}
+
+const calculateEditTotalPrice = () => {
+  const original = editForm.service_hours * editForm.price_per_hour
+  if (editForm.customer_type === 'REGULAR' && selectedEditBoss.value) {
+    const discount = getVipDiscount(selectedEditBoss.value.vipLevel)
+    editForm.total_amount = Number((original * discount).toFixed(2))
+  } else {
+    editForm.total_amount = Number(original.toFixed(2))
+  }
+}
+
+const submitEdit = async () => {
+  const valid = await editFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+
+  try {
+    let bossId = null
+    if (editForm.customer_type === 'REGULAR') {
+      if (editForm.boss_id) {
+        bossId = editForm.boss_id
+      } else if (editForm.boss_info && editForm.boss_info.trim()) {
+        const res = await createBoss({
+          name: editForm.boss_info.trim(),
+          contactType: 'WECHAT',
+          contactValue: '',
+          customerType: 'REGULAR',
+          vipLevel: 0
+        })
+        bossId = res.data?.id
+        await loadBosses()
+      }
+    }
+
+    const updateData = {
+      bossInfo: editForm.boss_info,
+      serviceContent: editForm.service_content,
+      serviceHours: editForm.service_hours,
+      pricePerHour: editForm.price_per_hour,
+      totalAmount: editForm.total_amount,
+      scheduledTime: editForm.scheduled_time ? dayjs(editForm.scheduled_time).format('YYYY-MM-DDTHH:mm:ss') : null,
+      remark: editForm.remark,
+      bossId: bossId,
+      useBalance: editForm.customer_type === 'REGULAR' ? editForm.use_balance : false
+    }
+
+    if (editForm.customer_type === 'REGULAR' && selectedEditBoss.value) {
+      updateData.originalAmount = editCalculatedOriginalPrice.value.toFixed(2)
+      const discount = getVipDiscount(selectedEditBoss.value.vipLevel)
+      updateData.discountRate = discount
+    }
+
+    await updateOrder(currentOrder.value.id, updateData)
+    ElMessage.success('订单修改成功')
+    editDialogVisible.value = false
+    loadOrders()
+  } catch (error) {
+    // 错误由 request.js 全局拦截器统一处理
+  }
+}
+
 // 自动刷新订单列表的定时器
 let autoRefreshInterval = null
 
@@ -1419,7 +2286,7 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .orders-page {
   padding: 20px;
-  background: #f5f7fa;
+  background: #f8f8fc;
   min-height: 100vh;
 }
 
@@ -1497,12 +2364,23 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-// 统计卡片
+// 统计卡片容器
 .stats-row {
   display: flex;
   gap: 15px;
   margin-bottom: 25px;
   flex-wrap: wrap;
+}
+
+.search-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+  
+  .search-input {
+    width: 300px;
+  }
 }
 
 .stat-card {
@@ -1561,6 +2439,11 @@ onUnmounted(() => {
   &.in-service .stat-icon {
     background: #f0f9eb;
     color: #67c23a;
+  }
+  
+  &.paused .stat-icon {
+    background: #f4f4f5;
+    color: #909399;
   }
   
   &.completed .stat-icon {
@@ -1678,6 +2561,18 @@ onUnmounted(() => {
     font-size: 15px;
   }
   
+  .amount-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .actual-amount-tag {
+    font-size: 12px;
+    color: #e6a23c;
+    font-weight: 600;
+  }
+  
   .no-player {
     color: #c0c4cc;
     font-style: italic;
@@ -1762,6 +2657,19 @@ onUnmounted(() => {
     }
   }
   
+  .actual-income-row {
+    .actual-income-value {
+      font-weight: 700;
+      color: #f56c6c;
+      font-size: 16px;
+    }
+  }
+  
+  .actual-hours {
+    color: #409eff;
+    font-weight: 600;
+  }
+  
   .service-timer {
     margin: 15px 0;
     padding: 15px;
@@ -1815,6 +2723,27 @@ onUnmounted(() => {
     padding: 25px 20px;
   }
   
+  // 时长输入组样式
+  .duration-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    
+    .duration-unit {
+      color: #606266;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    
+    .duration-total {
+      color: #409eff;
+      font-size: 14px;
+      font-weight: 500;
+      margin-left: 10px;
+    }
+  }
+  
   // 截图上传样式 - 商务简约风格
   .screenshot-section {
     background: #fafbfc;
@@ -1854,10 +2783,29 @@ onUnmounted(() => {
       display: flex;
       flex-direction: column;
       background: #fff;
-      border-radius: 8px;
+      border-radius: 12px;
       padding: 16px;
-      border: 1px solid #dcdfe6;
-      width: 240px;
+      border: 1px solid #e4e7ed;
+      width: 280px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      outline: none;
+      
+      &:hover {
+        border-color: #409eff;
+        box-shadow: 0 2px 12px rgba(64, 158, 255, 0.1);
+      }
+      
+      &:focus {
+        border-color: #409eff;
+        box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+      }
+      
+      &.active {
+        border-color: #409eff;
+        box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.3);
+        background: #f0f7ff;
+      }
 
       .card-header {
         display: flex;
@@ -1867,13 +2815,143 @@ onUnmounted(() => {
 
         .card-title {
           font-size: 14px;
-          font-weight: 500;
-          color: #606266;
+          font-weight: 600;
+          color: #303133;
         }
 
         .card-badge {
           color: #f56c6c;
           font-size: 14px;
+        }
+      }
+
+      .upload-area {
+        width: 100%;
+        height: 180px;
+        border: 2px dashed #dcdfe6;
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: #fafafa;
+        
+        &:hover {
+          border-color: #409eff;
+          background: #f0f7ff;
+        }
+      }
+
+      .screenshot-preview-wrapper {
+        position: relative;
+        width: 100%;
+        height: 100%;
+
+        &:hover .screenshot-overlay {
+          opacity: 1;
+        }
+        
+        &:hover .delete-btn {
+          opacity: 1;
+        }
+      }
+
+      .screenshot-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        cursor: pointer;
+      }
+      
+      .delete-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.6);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: all 0.2s ease;
+        z-index: 10;
+        
+        .el-icon {
+          color: #fff;
+          font-size: 16px;
+        }
+        
+        &:hover {
+          background: #f56c6c;
+          transform: scale(1.1);
+        }
+      }
+
+      .screenshot-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        opacity: 0;
+        transition: opacity 0.2s;
+
+        .overlay-icon {
+          font-size: 28px;
+          margin-bottom: 8px;
+        }
+
+        .overlay-text {
+          font-size: 13px;
+          font-weight: 500;
+        }
+      }
+
+      .upload-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding: 20px;
+
+        .upload-icon-box {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 16px;
+          box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+
+          .upload-icon {
+            font-size: 28px;
+            color: #fff;
+          }
+        }
+
+        .upload-text {
+          font-size: 14px;
+          color: #303133;
+          font-weight: 500;
+          margin-bottom: 6px;
+        }
+
+        .upload-hint {
+          font-size: 12px;
+          color: #909399;
         }
       }
 
@@ -1886,121 +2964,21 @@ onUnmounted(() => {
           display: flex;
           align-items: center;
           gap: 6px;
-          padding: 6px 12px;
-          border-radius: 4px;
+          padding: 6px 14px;
+          border-radius: 20px;
           font-size: 12px;
 
           &.success {
             background: #f0f9eb;
             color: #67c23a;
-            border: 1px solid #b3e19d;
+            border: 1px solid #c2e7b0;
           }
 
           &.pending {
             background: #fdf6ec;
             color: #e6a23c;
-            border: 1px solid #f3d19e;
+            border: 1px solid #faecd8;
           }
-        }
-      }
-    }
-
-    .screenshot-uploader {
-      :deep(.el-upload) {
-        border: 1px dashed #c0c4cc;
-        border-radius: 6px;
-        cursor: pointer;
-        position: relative;
-        overflow: hidden;
-        transition: all 0.2s;
-        width: 208px;
-        height: 156px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #fff;
-
-        &:hover {
-          border-color: #409eff;
-          background: #f5f7fa;
-        }
-      }
-
-      .screenshot-preview-wrapper {
-        position: relative;
-        width: 208px;
-        height: 156px;
-
-        &:hover .screenshot-overlay {
-          opacity: 1;
-        }
-      }
-
-      .screenshot-preview {
-        width: 208px;
-        height: 156px;
-        object-fit: cover;
-        border-radius: 6px;
-      }
-
-      .screenshot-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        color: #fff;
-        opacity: 0;
-        transition: opacity 0.2s;
-        border-radius: 6px;
-
-        .overlay-icon {
-          font-size: 24px;
-          margin-bottom: 4px;
-        }
-
-        .overlay-text {
-          font-size: 12px;
-        }
-      }
-
-      .upload-placeholder {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-
-        .upload-icon-box {
-          width: 48px;
-          height: 48px;
-          border-radius: 8px;
-          background: #f5f7fa;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 10px;
-
-          .upload-icon {
-            font-size: 24px;
-            color: #909399;
-          }
-        }
-
-        .upload-text {
-          font-size: 14px;
-          color: #606266;
-          margin-bottom: 4px;
-        }
-
-        .upload-hint {
-          font-size: 12px;
-          color: #909399;
         }
       }
     }
@@ -2059,6 +3037,12 @@ onUnmounted(() => {
   font-size: 18px;
   font-weight: 700;
   color: #f56c6c;
+}
+
+.detail-actual-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e6a23c;
 }
 
 .detail-cancel-reason {
@@ -2135,6 +3119,404 @@ onUnmounted(() => {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         transform: scale(1.02);
       }
+    }
+  }
+}
+
+.assign-filters {
+  display: flex;
+  gap: 10px;
+}
+
+.player-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+
+  .player-option-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .player-option-no {
+      font-family: monospace;
+      font-weight: 600;
+      color: #409eff;
+      font-size: 12px;
+    }
+  }
+
+  .player-option-tags {
+    display: flex;
+    gap: 4px;
+  }
+}
+
+.boss-suggestion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 4px 0;
+
+  .boss-suggestion-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .boss-suggestion-no {
+      font-family: monospace;
+      font-weight: 600;
+      color: #409eff;
+      font-size: 12px;
+    }
+  }
+
+  .boss-suggestion-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .boss-suggestion-balance {
+      font-size: 12px;
+      color: #909399;
+    }
+  }
+}
+
+.boss-match-info {
+  margin-top: 2px;
+  line-height: 1;
+}
+
+.player-count-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f0f9eb;
+  border-radius: 6px;
+  color: #67c23a;
+  font-size: 13px;
+
+  .el-icon {
+    font-size: 14px;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .orders-page {
+    padding: 10px;
+  }
+
+  .order-card {
+    border-radius: 8px;
+
+    :deep(.el-card__header) {
+      padding: 12px;
+    }
+
+    :deep(.el-card__body) {
+      padding: 12px;
+    }
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .header-title {
+    .title-icon {
+      font-size: 20px;
+    }
+
+    .title-text {
+      font-size: 17px;
+    }
+  }
+
+  .header-actions {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .date-filter-type {
+    width: 100%;
+
+    :deep(.el-radio-button__inner) {
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+  }
+
+  .date-range-picker {
+    width: 100%;
+
+    :deep(.el-date-editor) {
+      width: 100% !important;
+    }
+  }
+
+  .status-filter {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    :deep(.el-radio-group) {
+      display: flex;
+      flex-wrap: nowrap;
+      width: max-content;
+    }
+
+    :deep(.el-radio-button__inner) {
+      padding: 7px 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+  }
+
+  .create-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .search-row {
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+
+    .search-input {
+      width: 100%;
+    }
+
+    .el-button {
+      width: 100%;
+    }
+  }
+
+  .stats-row {
+    gap: 8px;
+    margin-bottom: 15px;
+  }
+
+  .stat-card {
+    min-width: calc(50% - 8px);
+    flex: 0 0 calc(50% - 8px);
+    padding: 12px;
+    gap: 10px;
+
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      font-size: 20px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+    }
+  }
+
+  .table-container {
+    margin-top: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    .el-table {
+      min-width: 700px;
+    }
+
+    .action-group {
+      .el-button {
+        padding: 5px 8px;
+        font-size: 12px;
+
+        .el-icon {
+          margin-right: 2px;
+        }
+      }
+    }
+  }
+
+  .order-item-card {
+    :deep(.el-card__header) {
+      padding: 10px 14px;
+    }
+  }
+
+  .order-content {
+    .info-row {
+      margin-bottom: 6px;
+
+      .info-label {
+        width: 65px;
+        font-size: 12px;
+      }
+
+      .info-value {
+        font-size: 13px;
+      }
+    }
+
+    .service-timer {
+      margin: 10px 0;
+      padding: 10px;
+
+      .timer-value {
+        font-size: 22px;
+      }
+    }
+
+    .action-buttons {
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+
+      .el-button {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+        font-size: 13px;
+      }
+    }
+  }
+
+  .pagination {
+    margin-top: 15px;
+
+    :deep(.el-pagination) {
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+
+      .el-pagination__sizes {
+        display: none;
+      }
+    }
+  }
+
+  .order-dialog {
+    :deep(.el-dialog) {
+      width: 95% !important;
+      margin: 10px auto !important;
+      border-radius: 12px;
+    }
+
+    :deep(.el-dialog__header) {
+      padding: 14px;
+    }
+
+    :deep(.el-dialog__body) {
+      padding: 14px;
+      max-height: 65vh;
+      overflow-y: auto;
+    }
+
+    :deep(.el-dialog__footer) {
+      padding: 12px 14px;
+    }
+
+    :deep(.el-form-item__label) {
+      float: none;
+      display: block;
+      text-align: left;
+      padding-bottom: 4px;
+      width: auto !important;
+    }
+
+    :deep(.el-form-item__content) {
+      margin-left: 0 !important;
+    }
+
+    .duration-input-group {
+      flex-wrap: wrap;
+      gap: 8px;
+
+      .el-input-number {
+        width: 100px !important;
+      }
+    }
+
+    .screenshot-section {
+      padding: 12px;
+
+      .screenshot-container {
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .screenshot-card {
+        width: 100%;
+        max-width: 320px;
+
+        .upload-area {
+          height: 140px;
+        }
+      }
+    }
+  }
+
+  .player-option {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .boss-suggestion-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .assign-filters {
+    flex-direction: column;
+    gap: 8px;
+
+    .el-select {
+      width: 100% !important;
+    }
+  }
+
+  .order-screenshots {
+    flex-direction: column;
+    align-items: center;
+
+    .screenshot-image {
+      width: 100%;
+      max-width: 280px;
+      height: 120px;
+    }
+  }
+
+  .el-descriptions {
+    :deep(.el-descriptions__body) {
+      .el-descriptions__table {
+        .el-descriptions__cell {
+          padding: 8px 10px;
+          font-size: 13px;
+        }
+      }
+    }
+  }
+
+  .scheduled-time-selectors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    .el-select {
+      width: 70px !important;
+      flex: 1;
+      min-width: 60px;
     }
   }
 }

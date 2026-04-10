@@ -34,6 +34,7 @@ public class OrderController {
     private final UserRepository userRepository;
     private final com.biubiu.repository.FinancialRecordRepository financialRecordRepository;
     private final com.biubiu.repository.OrderSessionRepository orderSessionRepository;
+    private final com.biubiu.repository.SystemConfigRepository systemConfigRepository;
     private final OrderService orderService;
 
     @GetMapping
@@ -42,6 +43,7 @@ public class OrderController {
             @RequestParam(required = false) Boolean today,
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate,
+            @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(defaultValue = "createdAt") String sortBy,
@@ -64,16 +66,33 @@ public class OrderController {
 
         Sort sort = Sort.by("desc".equalsIgnoreCase(sortOrder) ? Sort.Direction.DESC : Sort.Direction.ASC, sortBy);
 
-        Page<Order> orderPage = orderRepository.findOrders(
-                statusEnum,
-                playerId,
-                today,
-                startDate,
-                endDate,
-                excludeCancelled,
-                cancelledStatus,
-                PageRequest.of(page - 1, pageSize, sort)
-        );
+        Page<Order> orderPage;
+        
+        // 如果有搜索关键词，使用搜索查询
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            orderPage = orderRepository.searchOrders(
+                    keyword.trim(),
+                    statusEnum,
+                    playerId,
+                    today,
+                    startDate,
+                    endDate,
+                    excludeCancelled,
+                    cancelledStatus,
+                    PageRequest.of(page - 1, pageSize, sort)
+            );
+        } else {
+            orderPage = orderRepository.findOrders(
+                    statusEnum,
+                    playerId,
+                    today,
+                    startDate,
+                    endDate,
+                    excludeCancelled,
+                    cancelledStatus,
+                    PageRequest.of(page - 1, pageSize, sort)
+            );
+        }
 
         List<OrderResponse> list = orderPage.getContent().stream()
                 .map(this::convertToResponse)
@@ -97,6 +116,14 @@ public class OrderController {
         return ApiResponse.success("订单创建成功", convertToResponse(saved));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    public ApiResponse<OrderResponse> updateOrder(@PathVariable Long id, @Valid @RequestBody com.biubiu.dto.UpdateOrderRequest request) {
+        User currentUser = getCurrentUser();
+        Order saved = orderService.updateOrder(id, request, currentUser);
+        return ApiResponse.success("订单修改成功", convertToResponse(saved));
+    }
+
     @PostMapping("/{id}/assign")
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
     public ApiResponse<Void> assignOrder(@PathVariable Long id, @Valid @RequestBody AssignOrderRequest request) {
@@ -111,6 +138,20 @@ public class OrderController {
         User currentUser = getCurrentUser();
         orderService.cancelOrder(id, request.getReason(), currentUser);
         return ApiResponse.success("订单取消成功", null);
+    }
+
+    @PostMapping("/{id}/pause")
+    public ApiResponse<Void> pauseOrder(@PathVariable Long id, @Valid @RequestBody PauseOrderRequest request) {
+        User currentUser = getCurrentUser();
+        orderService.pauseOrder(id, request.getReason(), currentUser);
+        return ApiResponse.success("订单已暂存", null);
+    }
+
+    @PostMapping("/{id}/resume")
+    public ApiResponse<Void> resumeOrder(@PathVariable Long id) {
+        User currentUser = getCurrentUser();
+        orderService.resumeOrder(id, currentUser);
+        return ApiResponse.success("订单已恢复", null);
     }
 
     @GetMapping("/{id}")
@@ -131,7 +172,11 @@ public class OrderController {
     @PreAuthorize("hasRole('PLAYER')")
     public ApiResponse<List<OrderResponse>> getMyInServiceOrders() {
         User currentUser = getCurrentUser();
-        List<Order> orders = orderRepository.findByCurrentPlayerIdAndStatus(currentUser.getId(), Order.Status.IN_SERVICE);
+        List<Order> inServiceOrders = orderRepository.findByCurrentPlayerIdAndStatus(currentUser.getId(), Order.Status.IN_SERVICE);
+        List<Order> pausedOrders = orderRepository.findByCurrentPlayerIdAndStatus(currentUser.getId(), Order.Status.PAUSED);
+        List<Order> orders = new java.util.ArrayList<>();
+        orders.addAll(inServiceOrders);
+        orders.addAll(pausedOrders);
         List<OrderResponse> responses = orders.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
@@ -195,7 +240,12 @@ public class OrderController {
                 .assignedByNickname(order.getAssignedBy() != null ? order.getAssignedBy().getNickname() : null)
                 .cancelReason(order.getCancelReason())
                 .cancelledAt(order.getCancelledAt())
+                .pauseReason(order.getPauseReason())
+                .pausedAt(order.getPausedAt())
+                .resumedAt(order.getResumedAt())
+                .statusBeforePause(order.getStatusBeforePause() != null ? order.getStatusBeforePause().ordinal() : null)
                 .playerCount(order.getPlayerCount() != null ? order.getPlayerCount().name() : null)
+                .orderType(order.getOrderType())
                 .startScreenshotUrl(order.getStartScreenshotUrl())
                 .endScreenshotUrl(order.getEndScreenshotUrl())
                 .build();
@@ -233,22 +283,119 @@ public class OrderController {
                 }
             }
             
-            // 如果是已完成订单，附加上收入信息
-            if (order.getStatus() == Order.Status.COMPLETED) {
-                com.biubiu.entity.FinancialRecord record = financialRecordRepository.findFirstByOrderIdAndPlayerIdAndTypeOrderByIdDesc(
-                    order.getId(), 
-                    currentUser.getId(), 
-                    com.biubiu.entity.FinancialRecord.Type.income
-                ).orElse(null);
+            // 获取平台抽成比例
+            BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
+                    .map(com.biubiu.entity.SystemConfig::getPlatformFeeRate)
+                    .orElse(BigDecimal.valueOf(0.2));
+            
+            // 计算预计收入（始终基于订单总价）
+            BigDecimal orderTotalAmount = order.getTotalAmount();
+            if (orderTotalAmount == null) {
+                orderTotalAmount = order.getPricePerHour().multiply(order.getServiceHours());
+            }
+            BigDecimal expectedPlayerIncome = orderTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                response.setExpectedIncomeAmount(expectedPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+            } else {
+                response.setExpectedIncomeAmount(expectedPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+            }
+            
+            // 计算实际收入和实际订单金额
+            BigDecimal pricePerHour = order.getPricePerHour();
+            BigDecimal createdHours = order.getServiceHours();
+            BigDecimal actualHours = order.getActualHours() != null ? order.getActualHours() : createdHours;
+            
+            BigDecimal actualTotalAmount;
+            if (actualHours.compareTo(createdHours) > 0) {
+                BigDecimal extraMinutes = actualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
+                int totalExtraMinutes = extraMinutes.intValue();
+                int fullHours = totalExtraMinutes / 60;
+                int remainingMinutes = totalExtraMinutes % 60;
                 
-                if (record != null) {
-                    response.setIncomeAmount(record.getAmount());
+                BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(pricePerHour);
+                if (remainingMinutes > 15 && remainingMinutes <= 45) {
+                    extraFee = extraFee.add(pricePerHour.multiply(BigDecimal.valueOf(0.5)));
+                } else if (remainingMinutes > 45) {
+                    extraFee = extraFee.add(pricePerHour);
                 }
+                
+                actualTotalAmount = createdHours.multiply(pricePerHour).add(extraFee);
+            } else {
+                actualTotalAmount = createdHours.multiply(pricePerHour);
+            }
+            
+            response.setActualTotalAmount(actualTotalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
+            
+            BigDecimal actualPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                response.setActualIncomeAmount(actualPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+            } else {
+                response.setActualIncomeAmount(actualPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+            }
+            
+            // 设置incomeAmount（兼容旧逻辑）
+            if (order.getStatus() == Order.Status.COMPLETED) {
+                response.setIncomeAmount(response.getActualIncomeAmount());
+            } else {
+                response.setIncomeAmount(response.getExpectedIncomeAmount());
             }
         } else {
             response.setCurrentUserAccepted(false);
             response.setCurrentUserCompleted(false);
             response.setOtherPlayerCompleted(false);
+            
+            // 对于非陪玩师用户（管理员/客服），也需要计算实际金额用于显示
+            BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
+                    .map(com.biubiu.entity.SystemConfig::getPlatformFeeRate)
+                    .orElse(BigDecimal.valueOf(0.2));
+            
+            // 计算实际订单金额（基于实际时长）
+            BigDecimal pricePerHour = order.getPricePerHour();
+            BigDecimal createdHours = order.getServiceHours();
+            BigDecimal actualHours = order.getActualHours() != null ? order.getActualHours() : createdHours;
+            
+            BigDecimal actualTotalAmount;
+            if (actualHours.compareTo(createdHours) > 0) {
+                BigDecimal extraMinutes = actualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
+                int totalExtraMinutes = extraMinutes.intValue();
+                int fullHours = totalExtraMinutes / 60;
+                int remainingMinutes = totalExtraMinutes % 60;
+                
+                BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(pricePerHour);
+                if (remainingMinutes > 15 && remainingMinutes <= 45) {
+                    extraFee = extraFee.add(pricePerHour.multiply(BigDecimal.valueOf(0.5)));
+                } else if (remainingMinutes > 45) {
+                    extraFee = extraFee.add(pricePerHour);
+                }
+                
+                actualTotalAmount = createdHours.multiply(pricePerHour).add(extraFee);
+            } else {
+                actualTotalAmount = createdHours.multiply(pricePerHour);
+            }
+            
+            response.setActualTotalAmount(actualTotalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
+            
+            // 计算预计收入
+            BigDecimal orderTotalAmount = order.getTotalAmount();
+            if (orderTotalAmount == null) {
+                orderTotalAmount = order.getPricePerHour().multiply(order.getServiceHours());
+            }
+            response.setExpectedIncomeAmount(orderTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate)).setScale(2, java.math.RoundingMode.HALF_UP));
+            
+            // 计算实际收入
+            BigDecimal actualPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                response.setActualIncomeAmount(actualPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+            } else {
+                response.setActualIncomeAmount(actualPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+            }
+            
+            // 设置incomeAmount
+            if (order.getStatus() == Order.Status.COMPLETED) {
+                response.setIncomeAmount(response.getActualIncomeAmount());
+            } else {
+                response.setIncomeAmount(response.getExpectedIncomeAmount());
+            }
         }
         
         // 构建陪玩师会话信息列表（用于详情页面）

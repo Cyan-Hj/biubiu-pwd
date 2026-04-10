@@ -27,4 +27,7 @@ public interface BossRepository extends JpaRepository<Boss, Long> {
     Optional<Boss> findByName(String name);
 
     boolean existsByName(String name);
+
+    @Query("SELECT MAX(CAST(SUBSTRING(b.bossNo, 3) AS integer)) FROM Boss b WHERE b.bossNo LIKE 'B-%'")
+    Integer findMaxBossNo();
 }

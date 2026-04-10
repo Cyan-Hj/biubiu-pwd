@@ -915,7 +915,7 @@ onMounted(() => {
 <style scoped lang="scss">
 .settings-page {
   padding: 20px;
-  background: #f5f7fa;
+  background: #f8f8fc;
   min-height: 100vh;
 }
 
@@ -942,7 +942,7 @@ onMounted(() => {
   
   .title-icon {
     font-size: 24px;
-    color: #409eff;
+    color: #ff6b6b;
   }
   
   .title-text {
@@ -1010,7 +1010,7 @@ onMounted(() => {
 
 .level-table {
   :deep(th) {
-    background: #f5f7fa;
+    background: #f8f8fc;
     font-weight: 600;
     color: #606266;
   }
@@ -1022,7 +1022,7 @@ onMounted(() => {
   
   .sort-number {
     font-weight: 600;
-    color: #409eff;
+    color: #ff6b6b;
     font-size: 14px;
   }
 }
@@ -1045,7 +1045,7 @@ onMounted(() => {
   align-items: center;
   gap: 15px;
   padding: 15px;
-  background: #f5f7fa;
+  background: #f8f8fc;
   border-radius: 8px;
   
   .sort-tip {

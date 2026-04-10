@@ -36,4 +36,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     long countByRoleAndStatus(User.Role role, User.Status status);
 
     List<User> findByRole(User.Role role);
+
+    @Query("SELECT MAX(CAST(SUBSTRING(u.playerNo, 3) AS integer)) FROM User u WHERE u.playerNo LIKE 'P-%'")
+    Integer findMaxPlayerNo();
+
+    List<User> findByRoleOrderByCreatedAtDesc(User.Role role);
 }

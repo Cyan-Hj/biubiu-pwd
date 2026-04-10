@@ -93,6 +93,11 @@
 
       <!-- 老板列表 -->
       <el-table :data="bosses" v-loading="loading" stripe class="boss-table">
+        <el-table-column prop="bossNo" label="编号" width="100">
+          <template #default="{ row }">
+            <span class="boss-no">{{ row.bossNo || '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="name" label="姓名" width="120">
           <template #default="{ row }">
             <span class="boss-name">{{ row.name }}</span>
@@ -171,8 +176,16 @@
               >
                 <el-icon><CircleCheck /></el-icon>启用
               </el-button>
-              <el-button type="danger" size="small" @click="handleDelete(row)">
-                <el-icon><Delete /></el-icon>删除
+              <el-button
+                type="danger"
+                size="small"
+                :loading="deleting"
+                :disabled="deleting"
+                @click="handleDelete(row)"
+              >
+                <el-icon v-if="!deleting"><Delete /></el-icon>
+                <span v-if="deleting">删除中</span>
+                <span v-else>删除</span>
               </el-button>
             </div>
           </template>
@@ -446,6 +459,9 @@ const pageSize = ref(10)
 const total = ref(0)
 const vipLevels = ref([])
 
+// 删除操作防抖
+const deleting = ref(false)
+
 const filter = reactive({
   keyword: '',
   vipLevel: null,
@@ -670,6 +686,9 @@ const handleEnable = async (row) => {
 }
 
 const handleDelete = async (row) => {
+  // 防止重复点击
+  if (deleting.value) return
+  
   try {
     await ElMessageBox.confirm(
       `确定要删除老板 "${row.name}" 吗？此操作不可恢复！`,
@@ -680,13 +699,19 @@ const handleDelete = async (row) => {
         type: 'warning'
       }
     )
+    
+    deleting.value = true
     await deleteBoss(row.id)
     ElMessage.success('删除成功')
     loadBosses()
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '删除失败')
+    // 用户取消操作，不显示错误
+    if (error === 'cancel' || (error && error.message === 'cancel')) {
+      return
     }
+    // 错误消息已在 request.js 中统一处理，这里不再重复显示
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -838,7 +863,7 @@ onMounted(() => {
 <style scoped lang="scss">
 .boss-page {
   padding: 20px;
-  background: #f5f7fa;
+  background: #f8f8fc;
   min-height: 100vh;
 }
 
@@ -865,7 +890,7 @@ onMounted(() => {
 
   .title-icon {
     font-size: 24px;
-    color: #409eff;
+    color: #ff6b6b;
   }
 
   .title-text {
@@ -935,13 +960,13 @@ onMounted(() => {
   }
 
   &.primary .stat-icon {
-    background: #ecf5ff;
-    color: #409eff;
+    background: #fff5f5;
+    color: #ff6b6b;
   }
 
   &.success .stat-icon {
-    background: #f0f9eb;
-    color: #67c23a;
+    background: #fff8f0;
+    color: #f0c27f;
   }
 
   &.warning .stat-icon {
@@ -957,9 +982,16 @@ onMounted(() => {
 
 .boss-table {
   :deep(th) {
-    background: #f5f7fa;
+    background: #f8f8fc;
     font-weight: 600;
     color: #606266;
+  }
+
+  .boss-no {
+    font-family: monospace;
+    font-weight: 600;
+    color: #ff6b6b;
+    font-size: 13px;
   }
 
   .boss-name {
@@ -980,7 +1012,7 @@ onMounted(() => {
 
   .balance {
     font-weight: 700;
-    color: #67c23a;
+    color: #f0c27f;
 
     &.zero {
       color: #909399;
@@ -1020,7 +1052,7 @@ onMounted(() => {
 }
 
 .recharge-info {
-  background: #f5f7fa;
+  background: #f8f8fc;
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 20px;
@@ -1043,7 +1075,7 @@ onMounted(() => {
       color: #303133;
 
       &.highlight {
-        color: #67c23a;
+        color: #f0c27f;
         font-size: 18px;
       }
     }
@@ -1056,7 +1088,7 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 15px;
   padding: 10px 15px;
-  background: #f5f7fa;
+  background: #f8f8fc;
   border-radius: 8px;
 
   .boss-name {
@@ -1066,13 +1098,13 @@ onMounted(() => {
   }
 
   .balance {
-    color: #67c23a;
+    color: #f0c27f;
     font-weight: 600;
   }
 }
 
 .recharge {
-  color: #67c23a;
+  color: #f0c27f;
   font-weight: 600;
 }
 
