@@ -28,17 +28,20 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void initAdminUser() {
-        Optional<User> existing = userRepository.findByPhone("18191102965");
-        if (existing.isEmpty()) {
-            User admin = new User();
-            admin.setPhone("18191102965");
-            admin.setPassword(passwordEncoder.encode("rr031108"));
-            admin.setNickname("系统管理员");
-            admin.setRole(User.Role.ADMIN);
-            admin.setStatus(User.Status.active);
-            userRepository.save(admin);
-            System.out.println("初始化管理员账号: 18191102965 / rr031108");
+        // 如果数据库中已存在任何管理员账号，则不再创建
+        if (userRepository.existsByRole(User.Role.ADMIN)) {
+            return;
         }
+
+        // 只有在没有管理员时才创建默认管理员
+        User admin = new User();
+        admin.setPhone("13800000000");
+        admin.setPassword(passwordEncoder.encode("admin123"));
+        admin.setNickname("系统管理员");
+        admin.setRole(User.Role.ADMIN);
+        admin.setStatus(User.Status.active);
+        userRepository.save(admin);
+        System.out.println("初始化管理员账号: 13800000000 / admin123");
     }
 
     private void initCustomerServiceUser() {

@@ -485,11 +485,20 @@ public class OrderService {
             order.setActualHours(totalActualHours);
 
             // 保存截图URL
-            if (request.getStartScreenshotUrl() != null) {
-                order.setStartScreenshotUrl(request.getStartScreenshotUrl());
-            }
-            if (request.getEndScreenshotUrl() != null) {
-                order.setEndScreenshotUrl(request.getEndScreenshotUrl());
+            if (request.getScreenshotUrls() != null && !request.getScreenshotUrls().isEmpty()) {
+                // 新的多张截图格式
+                order.setStartScreenshotUrl(request.getScreenshotUrls().get(0));
+                if (request.getScreenshotUrls().size() > 1) {
+                    order.setEndScreenshotUrl(request.getScreenshotUrls().get(1));
+                }
+            } else {
+                // 兼容旧版本
+                if (request.getStartScreenshotUrl() != null) {
+                    order.setStartScreenshotUrl(request.getStartScreenshotUrl());
+                }
+                if (request.getEndScreenshotUrl() != null) {
+                    order.setEndScreenshotUrl(request.getEndScreenshotUrl());
+                }
             }
 
             // 计算订单实际金额

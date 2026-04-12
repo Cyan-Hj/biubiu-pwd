@@ -23,4 +23,6 @@ public interface LevelUpgradeApplicationRepository extends JpaRepository<LevelUp
     List<LevelUpgradeApplication> findPendingApplications();
 
     long countByStatus(ApplicationStatus status);
+
+    void deleteByPlayerId(Long playerId);
 }

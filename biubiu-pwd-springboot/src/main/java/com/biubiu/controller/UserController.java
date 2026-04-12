@@ -3,9 +3,11 @@ package com.biubiu.controller;
 import com.biubiu.dto.*;
 import com.biubiu.entity.Order;
 import com.biubiu.entity.User;
+import com.biubiu.repository.LevelUpgradeApplicationRepository;
 import com.biubiu.repository.OrderRepository;
 import com.biubiu.repository.UserRepository;
 import com.biubiu.security.JwtService;
+import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,6 +28,7 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
+    private final LevelUpgradeApplicationRepository levelUpgradeApplicationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -130,7 +133,12 @@ public class UserController {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));
 
-        if (request.getNickname() != null) {
+        // 检查昵称是否被其他已通过审核的陪玩师使用
+        if (request.getNickname() != null && !request.getNickname().equals(user.getNickname())) {
+            if (userRepository.existsByNicknameAndRoleAndStatus(
+                    request.getNickname(), User.Role.PLAYER, User.Status.active)) {
+                throw new RuntimeException("该昵称已被其他陪玩师使用，请更换其他昵称");
+            }
             user.setNickname(request.getNickname());
         }
         if (request.getLevel() != null) {
@@ -162,15 +170,28 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public ApiResponse<Void> deletePlayer(@PathVariable Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));
 
-        // 检查是否有进行中的订单
         long activeOrders = orderRepository.countByCurrentPlayerIdAndStatus(user.getId(), Order.Status.IN_SERVICE);
         if (activeOrders > 0) {
             throw new RuntimeException("该陪玩师有进行中的订单，无法删除");
         }
+
+        levelUpgradeApplicationRepository.deleteByPlayerId(user.getId());
+
+        List<Order> orders = orderRepository.findByPlayerId(user.getId());
+        for (Order order : orders) {
+            if (order.getCurrentPlayer() != null && order.getCurrentPlayer().getId().equals(user.getId())) {
+                order.setCurrentPlayer(null);
+            }
+            if (order.getCurrentPlayer2() != null && order.getCurrentPlayer2().getId().equals(user.getId())) {
+                order.setCurrentPlayer2(null);
+            }
+        }
+        orderRepository.saveAll(orders);
 
         userRepository.delete(user);
         return ApiResponse.success("删除成功", null);
@@ -211,6 +232,15 @@ public class UserController {
     @PutMapping("/nickname")
     public ApiResponse<Void> updateNickname(@Valid @RequestBody UpdateNicknameRequest request) {
         User user = getCurrentUserEntity();
+
+        // 检查昵称是否被其他已通过审核的陪玩师使用
+        if (!request.getNickname().equals(user.getNickname())) {
+            if (userRepository.existsByNicknameAndRoleAndStatus(
+                    request.getNickname(), User.Role.PLAYER, User.Status.active)) {
+                throw new RuntimeException("该昵称已被使用，请更换其他昵称");
+            }
+        }
+
         user.setNickname(request.getNickname());
         userRepository.save(user);
         return ApiResponse.success("昵称修改成功", null);

@@ -17,6 +17,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByPhone(String phone);
 
+    boolean existsByNicknameAndRoleAndStatus(String nickname, User.Role role, User.Status status);
+
     @Query("SELECT u FROM User u WHERE u.role = 'player' " +
            "AND (:status IS NULL OR u.status = :status) " +
            "AND (:level IS NULL OR u.level = :level) " +
@@ -32,6 +34,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     long countByStatus(User.Status status);
 
     long countByRole(User.Role role);
+
+    boolean existsByRole(User.Role role);
 
     long countByRoleAndStatus(User.Role role, User.Status status);
 
