@@ -33,12 +33,6 @@
               <el-radio-button :label="0">
                 <el-icon><CircleCheck /></el-icon>待分配
               </el-radio-button>
-              <el-radio-button :label="1">
-                <el-icon><Timer /></el-icon>待接单
-              </el-radio-button>
-              <el-radio-button :label="2">
-                <el-icon><Timer /></el-icon>待接单2
-              </el-radio-button>
               <el-radio-button :label="3">
                 <el-icon><Loading /></el-icon>服务中
               </el-radio-button>
@@ -97,13 +91,6 @@
             <div class="stat-info">
               <div class="stat-label">待分配</div>
               <div class="stat-value">{{ orderStats.pending }}</div>
-            </div>
-          </div>
-          <div class="stat-card waiting">
-            <div class="stat-icon"><el-icon><Timer /></el-icon></div>
-            <div class="stat-info">
-              <div class="stat-label">待接单</div>
-              <div class="stat-value">{{ orderStats.waiting }}</div>
             </div>
           </div>
           <div class="stat-card in-service">
@@ -218,7 +205,7 @@
                     <el-icon><Timer /></el-icon>等待他人接单
                   </el-button>
                   <!-- 服务中状态 - 当前用户未完成，另一人未完成：可以完成 -->
-                  <el-button v-if="order.status === 3 && !order.currentUserCompleted && !order.otherPlayerCompleted" type="warning" size="default" @click="handleComplete(order)">
+                  <el-button v-if="order.status === 3 && !order.currentUserCompleted && !order.otherPlayerCompleted" type="success" size="default" @click="handleComplete(order)">
                     <el-icon><CircleCheck /></el-icon>完成订单
                   </el-button>
                   <!-- 服务中状态 - 当前用户已完成，另一人未完成：等待他人 -->
@@ -226,11 +213,11 @@
                     <el-icon><Timer /></el-icon>等待他人完成
                   </el-button>
                   <!-- 服务中状态 - 当前用户未完成，另一人已完成：可以完成（最后一人） -->
-                  <el-button v-if="order.status === 3 && !order.currentUserCompleted && order.otherPlayerCompleted" type="warning" size="default" @click="handleComplete(order)">
+                  <el-button v-if="order.status === 3 && !order.currentUserCompleted && order.otherPlayerCompleted" type="success" size="default" @click="handleComplete(order)">
                     <el-icon><CircleCheck /></el-icon>完成订单
                   </el-button>
                   <!-- 暂存按钮 - 已接单(1或2)或服务中(3)时可暂存 -->
-                  <el-button v-if="(order.status === 1 || order.status === 2 || order.status === 3) && order.currentUserAccepted" type="info" size="default" @click="handlePause(order)">
+                  <el-button v-if="(order.status === 1 || order.status === 2 || order.status === 3) && order.currentUserAccepted" type="warning" size="default" @click="handlePause(order)">
                     <el-icon><VideoPause /></el-icon>暂存
                   </el-button>
                   <!-- 恢复按钮 - 暂存状态时可恢复 -->
@@ -348,11 +335,27 @@
                 </el-button>
                 <el-button
                   v-if="(isAdmin || isCustomerService) && row.status === 0"
-                  type="primary"
+                  type="success"
                   size="small"
                   @click="handleAssign(row)"
                 >
                   <el-icon><Position /></el-icon>派送
+                </el-button>
+                <el-button
+                  v-if="(isAdmin || isCustomerService) && row.status === 0 && !row.inGrabHall"
+                  type="primary"
+                  size="small"
+                  @click="handlePublishToHall(row)"
+                >
+                  <el-icon><Tickets /></el-icon>发布到大厅
+                </el-button>
+                <el-button
+                  v-if="(isAdmin || isCustomerService) && row.inGrabHall && row.grabStatus !== 'ASSIGNED'"
+                  type="info"
+                  size="small"
+                  @click="handleWithdrawFromHall(row)"
+                >
+                  <el-icon><RefreshLeft /></el-icon>从大厅撤回
                 </el-button>
                 <el-button
                   v-if="(isAdmin || isCustomerService) && (row.status === 1 || row.status === 2 || row.status === 3)"
@@ -364,7 +367,8 @@
                 </el-button>
                 <el-button
                   v-if="(isAdmin || isCustomerService) && (row.status === 0 || row.status === 3)"
-                  type="info"
+                  type="danger"
+                  plain
                   size="small"
                   @click="handlePause(row)"
                 >
@@ -373,6 +377,7 @@
                 <el-button
                   v-if="(isAdmin || isCustomerService) && row.status === 6"
                   type="success"
+                  plain
                   size="small"
                   @click="handleResume(row)"
                 >
@@ -967,11 +972,12 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { getOrders, getOrderById, getMyInServiceOrders, createOrder, updateOrder, assignOrder, acceptOrder, completeOrder, cancelOrder, pauseOrder, resumeOrder, batchDeleteOrders } from '@/api/orders'
+import { publishToHall, withdrawFromHall } from '@/api/grabHall'
 import { getPlayers } from '@/api/users'
 import { getLevelPrices, getSystemOptions } from '@/api/system'
 import { getBosses, getVipLevels, createBoss } from '@/api/boss'
 import dayjs from 'dayjs'
-import { Document, Plus, CircleCheck, CircleClose, Timer, Loading, Check, Position, RefreshRight, Calendar, View, User, Delete, Warning, Picture, InfoFilled, Upload, Clock, Edit, Search, Close, VideoPause } from '@element-plus/icons-vue'
+import { Document, Plus, CircleCheck, CircleClose, Timer, Loading, Check, Position, RefreshRight, Calendar, View, User, Delete, Warning, Picture, InfoFilled, Upload, Clock, Edit, Search, Close, VideoPause, Tickets, RefreshLeft } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -1311,6 +1317,15 @@ const loadOrders = async () => {
     }
     const res = await getOrders(params)
     orders.value = Array.isArray(res.data) ? res.data : (res.data?.list || [])
+    if (isPlayer.value) {
+      const statusPriority = { 3: 0, 1: 1, 2: 2, 6: 3, 0: 4, 4: 5, 5: 6 }
+      orders.value.sort((a, b) => {
+        const pa = statusPriority[a.status] ?? 99
+        const pb = statusPriority[b.status] ?? 99
+        if (pa !== pb) return pa - pb
+        return new Date(b.createdAt) - new Date(a.createdAt)
+      })
+    }
     total.value = res.data?.total || 0
     if (!isPlayer.value) {
       calculateStats()
@@ -1620,6 +1635,57 @@ const handleAssign = async (row) => {
   assignFilter.level = ''
   assignFilter.status = ''
   assignDialogVisible.value = true
+}
+
+const handlePublishToHall = async (row) => {
+  try {
+    let priorityLevel = null
+    if (row.orderType === 'huhang' && row.playerCount === 'SINGLE') {
+      const { value } = await ElMessageBox.prompt(
+        '可为单人护航单设置优先等级（高等级优先抢占），留空则不设置',
+        '发布到抢单大厅',
+        {
+          confirmButtonText: '发布',
+          cancelButtonText: '取消',
+          inputPlaceholder: '输入等级名称（如：黄金），留空不设置',
+          inputPattern: /^.{0,20}$/,
+          inputErrorMessage: '等级名称最长20个字符'
+        }
+      ).catch(() => ({ value: null }))
+      if (value === null) return
+      priorityLevel = value.trim() || null
+    } else {
+      await ElMessageBox.confirm('确定将此订单发布到抢单大厅？', '发布到抢单大厅', {
+        confirmButtonText: '发布',
+        cancelButtonText: '取消',
+        type: 'info'
+      })
+    }
+    await publishToHall(row.id, { priorityLevel })
+    ElMessage.success('发布成功')
+    loadOrders()
+  } catch (e) {
+    if (e !== 'cancel') {
+      // error handled by interceptor
+    }
+  }
+}
+
+const handleWithdrawFromHall = async (row) => {
+  try {
+    await ElMessageBox.confirm('确定将此订单从抢单大厅撤回？所有等待者将被清空。', '从大厅撤回', {
+      confirmButtonText: '撤回',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await withdrawFromHall(row.id)
+    ElMessage.success('撤回成功')
+    loadOrders()
+  } catch (e) {
+    if (e !== 'cancel') {
+      // error handled by interceptor
+    }
+  }
 }
 
 const handleDetail = async (row) => {

@@ -35,6 +35,9 @@ public class OrderService {
     private final BossRepository bossRepository;
     private final OrderBalanceService orderBalanceService;
     private final BossRechargeRecordRepository rechargeRecordRepository;
+    private final GrabWaitingPlayerRepository grabWaitingPlayerRepository;
+    private final GrabPriorityWaitRepository grabPriorityWaitRepository;
+    private final GrabCooldownRepository grabCooldownRepository;
 
     @Transactional
     public Order createOrder(CreateOrderRequest request, User currentUser) {
@@ -93,7 +96,6 @@ public class OrderService {
 
         Order.Status oldStatus = order.getStatus();
 
-        // 允许待分配或待接单状态（支持改派）
         if (order.getStatus() != Order.Status.PENDING_ASSIGN &&
             order.getStatus() != Order.Status.PENDING_ACCEPT &&
             order.getStatus() != Order.Status.PENDING_ACCEPT_2 &&
@@ -101,11 +103,22 @@ public class OrderService {
             throw new RuntimeException("订单状态不正确，无法派单或改派");
         }
 
-        // 双人订单
+        if (Boolean.TRUE.equals(order.getInGrabHall())) {
+            order.setInGrabHall(false);
+            order.setGrabStatus(null);
+            order.setGrabLeader(null);
+            order.setGrabPartner(null);
+            order.setGrabLockUntil(null);
+            order.setPriorityLevel(null);
+            order.setHallPublishTime(null);
+            grabWaitingPlayerRepository.deleteByOrderId(order.getId());
+            grabPriorityWaitRepository.deleteByOrderId(order.getId());
+            grabCooldownRepository.deleteByOrderId(order.getId());
+        }
+
         if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
             assignDoubleOrder(order, request, currentUser, oldStatus);
         } else {
-            // 单人订单
             assignSingleOrder(order, request, currentUser, oldStatus);
         }
     }

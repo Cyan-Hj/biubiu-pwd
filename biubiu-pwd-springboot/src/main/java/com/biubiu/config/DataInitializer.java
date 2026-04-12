@@ -2,12 +2,16 @@ package com.biubiu.config;
 
 import com.biubiu.entity.*;
 import com.biubiu.repository.*;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -17,7 +21,9 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final LevelPriceRepository levelPriceRepository;
     private final SystemConfigRepository systemConfigRepository;
+    private final OrderRepository orderRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EntityManager entityManager;
 
     @Override
     public void run(String... args) {
@@ -25,6 +31,8 @@ public class DataInitializer implements CommandLineRunner {
         initCustomerServiceUser();
         initLevelPrices();
         initSystemConfig();
+        migrateGrabConfigMinutesToSeconds();
+        recoverGrabStatus();
     }
 
     private void initAdminUser() {
@@ -86,6 +94,51 @@ public class DataInitializer implements CommandLineRunner {
             SystemConfig config = new SystemConfig();
             config.setPlatformFeeRate(BigDecimal.valueOf(0.2));
             systemConfigRepository.save(config);
+        }
+    }
+
+    @Transactional
+    public void migrateGrabConfigMinutesToSeconds() {
+        try {
+            var nativeQuery = entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_config' " +
+                "AND COLUMN_NAME = 'grab_team_lock_minutes'");
+            long count = ((Number) nativeQuery.getSingleResult()).longValue();
+            if (count > 0) {
+                entityManager.createNativeQuery(
+                    "UPDATE system_config SET " +
+                    "grab_team_lock_seconds = grab_team_lock_minutes * 60, " +
+                    "grab_cooldown_seconds = grab_cooldown_minutes * 60, " +
+                    "grab_priority_wait_seconds = grab_priority_wait_minutes * 60 " +
+                    "WHERE grab_team_lock_seconds = 60 AND grab_cooldown_seconds = 60 AND grab_priority_wait_seconds = 300"
+                ).executeUpdate();
+                entityManager.createNativeQuery(
+                    "ALTER TABLE system_config " +
+                    "DROP COLUMN grab_team_lock_minutes, " +
+                    "DROP COLUMN grab_cooldown_minutes, " +
+                    "DROP COLUMN grab_priority_wait_minutes"
+                ).executeUpdate();
+                System.out.println("迁移抢单配置：分钟→秒 完成");
+            }
+        } catch (Exception e) {
+            System.out.println("迁移抢单配置跳过: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void recoverGrabStatus() {
+        List<Order> expiredLocks = orderRepository.findByGrabStatusAndGrabLockUntilBefore(
+                Order.GrabStatus.LOCKED, LocalDateTime.now());
+        for (Order order : expiredLocks) {
+            order.setGrabStatus(Order.GrabStatus.OPEN);
+            order.setGrabLeader(null);
+            order.setGrabPartner(null);
+            order.setGrabLockUntil(null);
+            orderRepository.save(order);
+        }
+        if (!expiredLocks.isEmpty()) {
+            System.out.println("恢复抢单状态：释放 " + expiredLocks.size() + " 个过期锁定订单");
         }
     }
 }

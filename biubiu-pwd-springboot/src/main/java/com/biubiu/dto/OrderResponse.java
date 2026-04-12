@@ -69,4 +69,8 @@ public class OrderResponse {
     private String startScreenshotUrl;
     private String endScreenshotUrl;
     private List<String> screenshotUrls;
+
+    private Boolean inGrabHall;
+    private String grabStatus;
+    private String priorityLevel;
 }

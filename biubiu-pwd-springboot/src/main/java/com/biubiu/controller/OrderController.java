@@ -38,6 +38,7 @@ public class OrderController {
     private final com.biubiu.repository.OrderSessionRepository orderSessionRepository;
     private final com.biubiu.repository.SystemConfigRepository systemConfigRepository;
     private final OrderService orderService;
+    private final com.biubiu.service.GrabOrderService grabOrderService;
 
     @GetMapping
     public ApiResponse<PageResponse<OrderResponse>> getOrders(
@@ -218,6 +219,22 @@ public class OrderController {
         return ApiResponse.success("批量删除成功", null);
     }
 
+    @PostMapping("/{id}/publish-to-hall")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    public ApiResponse<Void> publishToHall(@PathVariable Long id, @RequestBody(required = false) com.biubiu.dto.PublishToHallRequest request) {
+        User currentUser = getCurrentUser();
+        grabOrderService.publishToHall(id, request, currentUser);
+        return ApiResponse.success("发布成功", null);
+    }
+
+    @PostMapping("/{id}/withdraw-from-hall")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    public ApiResponse<Void> withdrawFromHall(@PathVariable Long id) {
+        User currentUser = getCurrentUser();
+        grabOrderService.withdrawFromHall(id, currentUser);
+        return ApiResponse.success("撤回成功", null);
+    }
+
     private OrderResponse convertToResponse(Order order) {
         OrderResponse response = OrderResponse.builder()
                 .id(order.getId())
@@ -253,6 +270,9 @@ public class OrderController {
                 .screenshotUrls(order.getScreenshotUrls() != null && !order.getScreenshotUrls().isEmpty()
                     ? Arrays.asList(order.getScreenshotUrls().split(","))
                     : Collections.emptyList())
+                .inGrabHall(order.getInGrabHall())
+                .grabStatus(order.getGrabStatus() != null ? order.getGrabStatus().name() : null)
+                .priorityLevel(order.getPriorityLevel())
                 .build();
         
         // 获取当前登录用户

@@ -54,6 +54,9 @@ public class User {
     @Column(nullable = false)
     private Boolean enabled = true;
 
+    @Column(nullable = false)
+    private Integer tokenVersion = 0;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

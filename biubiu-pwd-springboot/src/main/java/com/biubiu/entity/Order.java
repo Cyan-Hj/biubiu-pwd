@@ -125,6 +125,37 @@ public class Order {
     @Column(name = "screenshot_urls", columnDefinition = "TEXT")
     private String screenshotUrls;
 
+    @Column(name = "in_grab_hall")
+    private Boolean inGrabHall = false;
+
+    @Column(name = "hall_publish_time")
+    private LocalDateTime hallPublishTime;
+
+    @Column(name = "grab_lock_until")
+    private LocalDateTime grabLockUntil;
+
+    @ManyToOne
+    @JoinColumn(name = "grab_leader_id")
+    private User grabLeader;
+
+    @ManyToOne
+    @JoinColumn(name = "grab_partner_id")
+    private User grabPartner;
+
+    @Column(name = "grab_status", length = 20)
+    @Enumerated(EnumType.STRING)
+    private GrabStatus grabStatus;
+
+    @Column(name = "priority_level", length = 20)
+    private String priorityLevel;
+
+    public enum GrabStatus {
+        OPEN,
+        WAITING,
+        LOCKED,
+        ASSIGNED
+    }
+
     public enum Status {
         PENDING_ASSIGN,    // 0: 待分配
         PENDING_ACCEPT,    // 1: 待接单（单人）/ 待接单1（双人第一个）

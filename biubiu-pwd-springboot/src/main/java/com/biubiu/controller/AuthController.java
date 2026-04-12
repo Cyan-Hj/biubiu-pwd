@@ -47,9 +47,13 @@ public class AuthController {
                 new UsernamePasswordAuthenticationToken(request.getPhone(), request.getPassword())
         );
 
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        userRepository.save(user);
+
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("role", user.getRole().name());
+        claims.put("tokenVersion", user.getTokenVersion());
 
         String token = jwtService.generateToken(claims, (org.springframework.security.core.userdetails.UserDetails) authentication.getPrincipal());
 

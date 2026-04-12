@@ -59,7 +59,23 @@ public class SystemController {
         if (request.getClearPlayerIncome() != null) {
             config.setClearPlayerIncome(request.getClearPlayerIncome());
         }
-        
+
+        if (request.getGrabEnabled() != null) {
+            config.setGrabEnabled(request.getGrabEnabled());
+        }
+        if (request.getGrabTeamLockSeconds() != null) {
+            config.setGrabTeamLockSeconds(request.getGrabTeamLockSeconds());
+        }
+        if (request.getGrabCooldownSeconds() != null) {
+            config.setGrabCooldownSeconds(request.getGrabCooldownSeconds());
+        }
+        if (request.getGrabPriorityWaitSeconds() != null) {
+            config.setGrabPriorityWaitSeconds(request.getGrabPriorityWaitSeconds());
+        }
+        if (request.getGrabPollingIntervalSeconds() != null) {
+            config.setGrabPollingIntervalSeconds(request.getGrabPollingIntervalSeconds());
+        }
+
         systemConfigRepository.save(config);
         return ApiResponse.success("配置更新成功", null);
     }
