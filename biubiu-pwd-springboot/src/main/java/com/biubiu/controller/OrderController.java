@@ -21,6 +21,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -248,6 +250,9 @@ public class OrderController {
                 .orderType(order.getOrderType())
                 .startScreenshotUrl(order.getStartScreenshotUrl())
                 .endScreenshotUrl(order.getEndScreenshotUrl())
+                .screenshotUrls(order.getScreenshotUrls() != null && !order.getScreenshotUrls().isEmpty()
+                    ? Arrays.asList(order.getScreenshotUrls().split(","))
+                    : Collections.emptyList())
                 .build();
         
         // 获取当前登录用户
@@ -263,9 +268,14 @@ public class OrderController {
             boolean hasActiveSession = sessions.stream().anyMatch(s -> s.getEndedAt() == null);
             response.setCurrentUserAccepted(hasActiveSession);
             
-            // 检查当前用户是否已完成（存在已结束的会话）
-            boolean hasCompletedSession = sessions.stream().anyMatch(s -> s.getEndedAt() != null);
-            response.setCurrentUserCompleted(hasCompletedSession);
+            // 检查当前用户是否已完成：仅在订单状态为IN_SERVICE时，判断是否有已结束的会话且没有活跃会话
+            if (order.getStatus() == Order.Status.IN_SERVICE) {
+                boolean hasCompletedSession = sessions.stream().anyMatch(s -> s.getEndedAt() != null);
+                boolean hasActive = sessions.stream().anyMatch(s -> s.getEndedAt() == null);
+                response.setCurrentUserCompleted(hasCompletedSession && !hasActive);
+            } else {
+                response.setCurrentUserCompleted(false);
+            }
             
             // 对于双人订单，检查另一个陪玩师是否已完成
             if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
@@ -274,10 +284,14 @@ public class OrderController {
                     (order.getCurrentPlayer() != null ? order.getCurrentPlayer().getId() : null);
                 
                 if (otherPlayerId != null) {
-                    // 检查另一个陪玩师是否有已结束的会话
                     List<com.biubiu.entity.OrderSession> otherSessions = orderSessionRepository.findByOrderIdAndPlayerId(order.getId(), otherPlayerId);
-                    boolean otherCompleted = otherSessions.stream().anyMatch(s -> s.getEndedAt() != null);
-                    response.setOtherPlayerCompleted(otherCompleted);
+                    if (order.getStatus() == Order.Status.IN_SERVICE) {
+                        boolean otherHasCompleted = otherSessions.stream().anyMatch(s -> s.getEndedAt() != null);
+                        boolean otherHasActive = otherSessions.stream().anyMatch(s -> s.getEndedAt() == null);
+                        response.setOtherPlayerCompleted(otherHasCompleted && !otherHasActive);
+                    } else {
+                        response.setOtherPlayerCompleted(false);
+                    }
                 } else {
                     response.setOtherPlayerCompleted(false);
                 }

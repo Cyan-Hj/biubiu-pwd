@@ -93,7 +93,7 @@
             <div class="stat-value">{{ playerStats.total }}</div>
           </div>
         </div>
-        <div class="stat-card upgrade" @click="showUpgradePanel = !showUpgradePanel" style="cursor: pointer;">
+        <div v-if="isAdmin" class="stat-card upgrade" @click="showUpgradePanel = !showUpgradePanel" style="cursor: pointer;">
           <div class="stat-icon"><el-icon><TopRight /></el-icon></div>
           <div class="stat-info">
             <div class="stat-label">升级申请</div>
@@ -674,7 +674,10 @@ const handleBatchApprove = async () => {
 onMounted(() => {
   loadLevels()
   loadPlayers()
-  loadUpgradeApplications()
+  // 只有管理员才加载升级申请
+  if (isAdmin.value) {
+    loadUpgradeApplications()
+  }
 })
 </script>
 

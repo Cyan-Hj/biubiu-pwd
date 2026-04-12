@@ -21,7 +21,7 @@ public class BossRechargeRecord {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, columnDefinition = "varchar(20)")
     @Enumerated(EnumType.STRING)
     private Type type;
 

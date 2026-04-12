@@ -670,102 +670,41 @@
           <div class="section-header">
             <div class="section-title">
               <el-icon><Picture /></el-icon>
-              <span>服务截图</span>
+              <span>结单截图</span>
             </div>
-            <el-tag type="info" size="small" effect="light">支持复制粘贴上传</el-tag>
+            <el-tag type="info" size="small" effect="light">支持复制粘贴上传，可上传多张</el-tag>
           </div>
-          
-          <div class="screenshot-container">
-            <!-- 开始截图 -->
-            <div class="screenshot-card"
-                 :class="{ active: activeUploadCard === 'start' }"
-                 tabindex="0"
-                 ref="startCardRef"
-                 @mouseenter="activeUploadCard = 'start'"
-                 @dragover.prevent
-                 @drop.prevent="handleDrop($event, 'start')">
-              <div class="card-header">
-                <span class="card-title">开始截图</span>
-                <span class="card-badge required">*</span>
-              </div>
-              <div class="upload-area">
-                <div v-if="completeForm.start_screenshot_preview || completeForm.start_screenshot_url" class="screenshot-preview-wrapper">
-                  <img :src="completeForm.start_screenshot_preview || completeForm.start_screenshot_url" class="screenshot-preview" @click="triggerUpload('start')" />
-                  <button class="delete-btn" @click.stop="deleteScreenshot('start')" title="删除截图">
-                    <el-icon><Close /></el-icon>
-                  </button>
-                  <div class="screenshot-overlay" @click="triggerUpload('start')">
-                    <el-icon class="overlay-icon"><RefreshRight /></el-icon>
-                    <span class="overlay-text">点击更换</span>
-                  </div>
-                </div>
-                <div v-else class="upload-placeholder">
-                  <div class="upload-icon-box">
-                    <el-icon class="upload-icon"><Upload /></el-icon>
-                  </div>
-                  <div class="upload-hint">按 Ctrl+V 粘贴截图</div>
-                </div>
-                <input type="file" ref="startScreenshotInput" style="display: none" accept="image/*" @change="handleFileSelect($event, 'start')" />
-              </div>
-              <div class="card-footer">
-                <div v-if="completeForm.start_screenshot_preview || completeForm.start_screenshot_url" class="status-badge success">
-                  <el-icon class="status-icon"><CircleCheck /></el-icon>
-                  <span>已选择</span>
-                </div>
-                <div v-else class="status-badge pending">
-                  <el-icon class="status-icon"><Clock /></el-icon>
-                  <span>等待选择</span>
-                </div>
+
+          <div class="simple-screenshot-container">
+            <!-- 已上传的截图预览列表 -->
+            <div v-if="completeForm.screenshots.length > 0" class="screenshot-preview-list">
+              <div v-for="(item, index) in completeForm.screenshots" :key="item.id" class="screenshot-preview-item">
+                <img :src="item.preview || item.url" class="screenshot-img" />
+                <button class="screenshot-delete-btn" @click.stop="deleteScreenshot(index)" title="删除">
+                  <el-icon><Close /></el-icon>
+                </button>
               </div>
             </div>
 
-            <!-- 结束截图 -->
-            <div class="screenshot-card"
-                 :class="{ active: activeUploadCard === 'end' }"
+            <!-- 上传区域 -->
+            <div v-if="completeForm.screenshots.length === 0" class="simple-upload-area"
                  tabindex="0"
-                 ref="endCardRef"
-                 @mouseenter="activeUploadCard = 'end'"
                  @dragover.prevent
-                 @drop.prevent="handleDrop($event, 'end')">
-              <div class="card-header">
-                <span class="card-title">结束截图</span>
-                <span class="card-badge required">*</span>
+                 @drop.prevent="handleDrop($event)"
+                 @click="triggerUpload"
+                 @paste="handlePaste($event)">
+              <div class="upload-content">
+                <el-icon class="upload-main-icon"><Plus /></el-icon>
+                <span class="upload-main-text">点击、拖拽或粘贴截图</span>
+                <span class="upload-sub-text">支持 Ctrl+V 粘贴</span>
               </div>
-              <div class="upload-area">
-                <div v-if="completeForm.end_screenshot_preview || completeForm.end_screenshot_url" class="screenshot-preview-wrapper">
-                  <img :src="completeForm.end_screenshot_preview || completeForm.end_screenshot_url" class="screenshot-preview" @click="triggerUpload('end')" />
-                  <button class="delete-btn" @click.stop="deleteScreenshot('end')" title="删除截图">
-                    <el-icon><Close /></el-icon>
-                  </button>
-                  <div class="screenshot-overlay" @click="triggerUpload('end')">
-                    <el-icon class="overlay-icon"><RefreshRight /></el-icon>
-                    <span class="overlay-text">点击更换</span>
-                  </div>
-                </div>
-                <div v-else class="upload-placeholder">
-                  <div class="upload-icon-box">
-                    <el-icon class="upload-icon"><Upload /></el-icon>
-                  </div>
-                  <div class="upload-hint">按 Ctrl+V 粘贴截图</div>
-                </div>
-                <input type="file" ref="endScreenshotInput" style="display: none" accept="image/*" @change="handleFileSelect($event, 'end')" />
-              </div>
-              <div class="card-footer">
-                <div v-if="completeForm.end_screenshot_preview || completeForm.end_screenshot_url" class="status-badge success">
-                  <el-icon class="status-icon"><CircleCheck /></el-icon>
-                  <span>已选择</span>
-                </div>
-                <div v-else class="status-badge pending">
-                  <el-icon class="status-icon"><Clock /></el-icon>
-                  <span>等待选择</span>
-                </div>
-              </div>
+              <input type="file" ref="screenshotInput" style="display: none" accept="image/*" multiple @change="handleFileSelect" />
             </div>
           </div>
 
-          <div class="screenshot-hint">
+          <div v-if="completeForm.screenshots.length === 0" class="screenshot-hint">
             <el-icon><InfoFilled /></el-icon>
-            <span>鼠标悬停在对应卡片上，按 Ctrl+V 粘贴截图，确认完成后才上传</span>
+            <span>请上传至少一张结单截图，可上传多张，确认完成后统一上传</span>
           </div>
         </div>
       </el-form>
@@ -894,24 +833,28 @@
     </el-dialog>
 
     <!-- 暂存订单对话框 -->
-    <el-dialog v-model="pauseDialogVisible" title="暂存订单" width="450px" class="order-dialog">
-      <el-form :model="pauseForm" :rules="pauseRules" ref="pauseFormRef" label-width="100px">
-        <el-form-item label="订单号">
-          <span class="order-no-display">{{ currentOrder?.orderNo }}</span>
-        </el-form-item>
-        <el-form-item label="暂存原因" prop="reason">
-          <el-input
-            v-model="pauseForm.reason"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入暂存原因"
-          />
-        </el-form-item>
-      </el-form>
+    <el-dialog v-model="pauseDialogVisible" title="暂存订单" width="400px" class="order-dialog pause-dialog">
+      <div class="pause-confirm-content">
+        <el-icon class="pause-icon"><VideoPause /></el-icon>
+        <p class="pause-tip">确认暂存订单 <strong>{{ currentOrder?.orderNo }}</strong> ？</p>
+        <p class="pause-sub-tip">暂存后可随时恢复订单继续服务</p>
+      </div>
       <template #footer>
-        <el-button @click="pauseDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitPause">确认暂存</el-button>
+        <el-button @click="pauseDialogVisible = false">取 消</el-button>
+        <el-button type="warning" @click="submitPause">确认暂存</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 图片预览对话框 -->
+    <el-dialog 
+      v-model="previewVisible" 
+      width="auto"
+      class="image-preview-dialog" 
+      :show-close="true"
+      destroy-on-close
+      align-center
+    >
+      <img :src="previewImageUrl" class="preview-image" />
     </el-dialog>
 
     <!-- 订单详情对话框 -->
@@ -998,27 +941,16 @@
         <el-descriptions-item label="备注" :span="2">{{ currentOrder.remark || '-' }}</el-descriptions-item>
         
         <!-- 完成订单截图展示 -->
-        <template v-if="currentOrder.status === 4 && (currentOrder.startScreenshotUrl || currentOrder.endScreenshotUrl)">
+        <template v-if="currentOrder.status === 4 && detailScreenshotUrls.length > 0">
           <el-descriptions-item label="完成截图" :span="2">
-            <div class="order-screenshots">
-              <div v-if="currentOrder.startScreenshotUrl" class="screenshot-item">
-                <div class="screenshot-label">开始截图</div>
-                <el-image 
-                  :src="currentOrder.startScreenshotUrl" 
-                  :preview-src-list="[currentOrder.startScreenshotUrl, currentOrder.endScreenshotUrl].filter(Boolean)"
-                  fit="cover"
-                  class="screenshot-image"
-                />
-              </div>
-              <div v-if="currentOrder.endScreenshotUrl" class="screenshot-item">
-                <div class="screenshot-label">结束截图</div>
-                <el-image 
-                  :src="currentOrder.endScreenshotUrl" 
-                  :preview-src-list="[currentOrder.startScreenshotUrl, currentOrder.endScreenshotUrl].filter(Boolean)"
-                  fit="cover"
-                  class="screenshot-image"
-                />
-              </div>
+            <div class="detail-screenshot-list">
+              <img 
+                v-for="url in detailScreenshotUrls" 
+                :key="url"
+                :src="url"
+                class="detail-screenshot-img"
+                @click="openImagePreview(url)"
+              />
             </div>
           </el-descriptions-item>
         </template>
@@ -1220,28 +1152,17 @@ const getLevelTagType = (level) => {
 const completeForm = reactive({
   actual_hours: 1,
   actual_minutes: 0,
-  // 本地预览URL（用于显示）
-  start_screenshot_preview: '',
-  end_screenshot_preview: '',
-  // 本地文件对象（用于上传）
-  start_screenshot_file: null,
-  end_screenshot_file: null,
-  // 服务器返回的URL（上传成功后填充）
-  start_screenshot_url: '',
-  end_screenshot_url: ''
+  // 结单截图列表（支持多张）
+  screenshots: [], // 每项: { preview: '', file: null, url: '' }
 })
 
 const completeRules = {
   actual_hours: [{ required: true, message: '请输入实际时长', trigger: 'blur' }],
-  start_screenshot: [{ required: true, message: '请上传开始截图', trigger: 'change' }],
-  end_screenshot: [{ required: true, message: '请上传结束截图', trigger: 'change' }]
+  screenshots: [{ required: true, message: '请上传至少一张结单截图', trigger: 'change' }]
 }
 
 const completeFormRef = ref()
-const startScreenshotInput = ref()
-const endScreenshotInput = ref()
-const startCardRef = ref()
-const endCardRef = ref()
+const screenshotInput = ref()
 const completing = ref(false)
 const activeUploadCard = ref(null)
 
@@ -1701,9 +1622,32 @@ const handleAssign = async (row) => {
   assignDialogVisible.value = true
 }
 
-const handleDetail = (row) => {
-  currentOrder.value = row
+const handleDetail = async (row) => {
+  try {
+    const res = await getOrderById(row.id)
+    currentOrder.value = res.data || row
+  } catch (error) {
+    currentOrder.value = row
+  }
   detailDialogVisible.value = true
+}
+
+// 详情页截图URL列表（优先使用 screenshotUrls，兼容旧字段）
+const detailScreenshotUrls = computed(() => {
+  if (!currentOrder.value) return []
+  if (currentOrder.value.screenshotUrls && currentOrder.value.screenshotUrls.length > 0) {
+    return currentOrder.value.screenshotUrls
+  }
+  return [currentOrder.value.startScreenshotUrl, currentOrder.value.endScreenshotUrl].filter(Boolean)
+})
+
+// 图片预览
+const previewVisible = ref(false)
+const previewImageUrl = ref('')
+
+const openImagePreview = (url) => {
+  previewImageUrl.value = url
+  previewVisible.value = true
 }
 
 const submitAssign = async () => {
@@ -1833,90 +1777,62 @@ const handleGlobalPaste = (event) => {
     if (item.type.indexOf('image') !== -1) {
       const file = item.getAsFile()
       if (file) {
-        // 本地预览，不上传
-        const target = activeUploadCard.value || 'start'
-        const localUrl = URL.createObjectURL(file)
-        if (target === 'start') {
-          completeForm.start_screenshot_preview = localUrl
-          completeForm.start_screenshot_file = file
-        } else {
-          completeForm.end_screenshot_preview = localUrl
-          completeForm.end_screenshot_file = file
-        }
+        addScreenshot(file)
       }
       break
     }
   }
 }
 
-const selectCard = (type) => {
-  activeUploadCard.value = type
-  // 让卡片获得焦点
-  const cardRef = type === 'start' ? startCardRef.value : endCardRef.value
-  cardRef?.focus()
+const addScreenshot = (file) => {
+  const localUrl = URL.createObjectURL(file)
+  completeForm.screenshots.push({
+    id: Date.now() + Math.random(), // 唯一ID
+    preview: localUrl,
+    file: file,
+    url: ''
+  })
 }
 
-const handleDrop = (event, type) => {
+const handleDrop = (event) => {
   const files = event.dataTransfer?.files
   if (!files || files.length === 0) return
 
-  const file = files[0]
-  if (file.type.indexOf('image') !== -1) {
-    // 本地预览，不上传
-    const localUrl = URL.createObjectURL(file)
-    if (type === 'start') {
-      completeForm.start_screenshot_preview = localUrl
-      completeForm.start_screenshot_file = file
-    } else {
-      completeForm.end_screenshot_preview = localUrl
-      completeForm.end_screenshot_file = file
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    if (file.type.indexOf('image') !== -1) {
+      addScreenshot(file)
     }
   }
 }
 
-const triggerUpload = (type) => {
-  const input = type === 'start' ? startScreenshotInput.value : endScreenshotInput.value
-  input?.click()
+const triggerUpload = () => {
+  screenshotInput.value?.click()
 }
 
-const deleteScreenshot = (type) => {
-  if (type === 'start') {
-    // 释放本地预览URL
-    if (completeForm.start_screenshot_preview) {
-      URL.revokeObjectURL(completeForm.start_screenshot_preview)
-    }
-    completeForm.start_screenshot_preview = ''
-    completeForm.start_screenshot_file = null
-    completeForm.start_screenshot_url = ''
-  } else {
-    // 释放本地预览URL
-    if (completeForm.end_screenshot_preview) {
-      URL.revokeObjectURL(completeForm.end_screenshot_preview)
-    }
-    completeForm.end_screenshot_preview = ''
-    completeForm.end_screenshot_file = null
-    completeForm.end_screenshot_url = ''
+const deleteScreenshot = (index) => {
+  const item = completeForm.screenshots[index]
+  if (item.preview) {
+    URL.revokeObjectURL(item.preview)
   }
+  completeForm.screenshots.splice(index, 1)
 }
 
-const handleFileSelect = (event, type) => {
-  const file = event.target.files?.[0]
-  if (file && file.type.indexOf('image') !== -1) {
-    // 本地预览，不上传
-    const localUrl = URL.createObjectURL(file)
-    if (type === 'start') {
-      completeForm.start_screenshot_preview = localUrl
-      completeForm.start_screenshot_file = file
-    } else {
-      completeForm.end_screenshot_preview = localUrl
-      completeForm.end_screenshot_file = file
+const handleFileSelect = (event) => {
+  const files = event.target.files
+  if (!files || files.length === 0) return
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    if (file.type.indexOf('image') !== -1) {
+      addScreenshot(file)
     }
   }
   // 清空input，允许重复选择同一文件
   event.target.value = ''
 }
 
-const uploadImage = async (file, type) => {
+const uploadImage = async (file) => {
   const formData = new FormData()
   formData.append('file', file)
 
@@ -1932,16 +1848,14 @@ const uploadImage = async (file, type) => {
     const result = await response.json()
 
     if (result.success !== false && result.data) {
-      if (type === 'start') {
-        completeForm.start_screenshot_url = result.data
-      } else {
-        completeForm.end_screenshot_url = result.data
-      }
+      return result.data
     } else {
       ElMessage.error(result.message || '上传失败')
+      return null
     }
   } catch (error) {
     ElMessage.error('上传失败')
+    return null
   }
 }
 
@@ -1949,35 +1863,36 @@ const submitComplete = async () => {
   const valid = await completeFormRef.value?.validate().catch(() => false)
   if (!valid) return
 
-  // 检查截图是否已选择（本地预览或已上传）
-  if (!completeForm.start_screenshot_preview && !completeForm.start_screenshot_url) {
-    ElMessage.error('请选择开始截图')
-    return
-  }
-  if (!completeForm.end_screenshot_preview && !completeForm.end_screenshot_url) {
-    ElMessage.error('请选择结束截图')
+  // 检查是否至少上传了一张截图
+  if (completeForm.screenshots.length === 0) {
+    ElMessage.error('请上传至少一张结单截图')
     return
   }
 
   completing.value = true
   try {
-    // 如果有本地文件，先上传
-    if (completeForm.start_screenshot_file) {
-      await uploadImage(completeForm.start_screenshot_file, 'start')
-    }
-    if (completeForm.end_screenshot_file) {
-      await uploadImage(completeForm.end_screenshot_file, 'end')
-    }
-
-    // 检查上传是否成功
-    if (!completeForm.start_screenshot_url || !completeForm.end_screenshot_url) {
-      ElMessage.error('截图上传失败，请重试')
-      return
+    // 上传所有未上传的截图
+    const screenshotUrls = []
+    for (let i = 0; i < completeForm.screenshots.length; i++) {
+      const item = completeForm.screenshots[i]
+      if (item.url) {
+        // 已上传过，直接使用
+        screenshotUrls.push(item.url)
+      } else if (item.file) {
+        // 需要上传
+        const url = await uploadImage(item.file)
+        if (url) {
+          item.url = url
+          screenshotUrls.push(url)
+        } else {
+          ElMessage.error(`第${i + 1}张截图上传失败，请重试`)
+          return
+        }
+      }
     }
 
     const payload = {
-      startScreenshotUrl: completeForm.start_screenshot_url,
-      endScreenshotUrl: completeForm.end_screenshot_url
+      screenshotUrls: screenshotUrls
     }
     if (currentOrder.value?.orderType !== 'huhang') {
       const totalMinutes = (completeForm.actual_hours || 0) * 60 + (completeForm.actual_minutes || 0)
@@ -1988,21 +1903,14 @@ const submitComplete = async () => {
     completeDialogVisible.value = false
     // 移除全局粘贴事件监听
     document.removeEventListener('paste', handleGlobalPaste)
-    activeUploadCard.value = null
-    // 释放本地预览URL
-    if (completeForm.start_screenshot_preview) {
-      URL.revokeObjectURL(completeForm.start_screenshot_preview)
-    }
-    if (completeForm.end_screenshot_preview) {
-      URL.revokeObjectURL(completeForm.end_screenshot_preview)
-    }
+    // 释放所有本地预览URL
+    completeForm.screenshots.forEach(item => {
+      if (item.preview) {
+        URL.revokeObjectURL(item.preview)
+      }
+    })
     // 重置表单
-    completeForm.start_screenshot_preview = ''
-    completeForm.end_screenshot_preview = ''
-    completeForm.start_screenshot_file = null
-    completeForm.end_screenshot_file = null
-    completeForm.start_screenshot_url = ''
-    completeForm.end_screenshot_url = ''
+    completeForm.screenshots = []
     loadOrders()
   } catch (error) {
     // 错误已在request.js中处理
@@ -2081,16 +1989,12 @@ const submitCancel = async () => {
 
 const handlePause = (row) => {
   currentOrder.value = row
-  pauseForm.reason = ''
   pauseDialogVisible.value = true
 }
 
 const submitPause = async () => {
-  const valid = await pauseFormRef.value?.validate().catch(() => false)
-  if (!valid) return
-
   try {
-    await pauseOrder(currentOrder.value.id, { reason: pauseForm.reason })
+    await pauseOrder(currentOrder.value.id, { reason: '' })
     ElMessage.success('订单已暂存')
     pauseDialogVisible.value = false
     loadOrders()
@@ -2773,211 +2677,112 @@ onUnmounted(() => {
       }
     }
 
-    .screenshot-container {
-      display: flex;
-      gap: 20px;
-      justify-content: center;
-    }
-
-    .screenshot-card {
+    // 简洁截图上传区域
+    .simple-screenshot-container {
       display: flex;
       flex-direction: column;
-      background: #fff;
-      border-radius: 12px;
-      padding: 16px;
-      border: 1px solid #e4e7ed;
-      width: 280px;
-      transition: all 0.3s ease;
-      cursor: pointer;
-      outline: none;
-      
-      &:hover {
-        border-color: #409eff;
-        box-shadow: 0 2px 12px rgba(64, 158, 255, 0.1);
-      }
-      
-      &:focus {
-        border-color: #409eff;
-        box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
-      }
-      
-      &.active {
-        border-color: #409eff;
-        box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.3);
-        background: #f0f7ff;
-      }
+      gap: 16px;
 
-      .card-header {
+      // 已上传截图预览列表
+      .screenshot-preview-list {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 12px;
 
-        .card-title {
-          font-size: 14px;
-          font-weight: 600;
-          color: #303133;
-        }
+        .screenshot-preview-item {
+          position: relative;
+          width: 120px;
+          height: 80px;
+          border-radius: 6px;
+          overflow: hidden;
+          border: 1px solid #e4e7ed;
+          cursor: pointer;
 
-        .card-badge {
-          color: #f56c6c;
-          font-size: 14px;
+          &:hover {
+            border-color: #409eff;
+
+            .screenshot-delete-btn {
+              display: flex;
+            }
+          }
+
+          .screenshot-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+
+          .screenshot-delete-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+
+            .el-icon {
+              color: #fff;
+              font-size: 12px;
+            }
+
+            &:hover {
+              background: #f56c6c;
+            }
+          }
         }
       }
 
-      .upload-area {
+      // 上传区域 - 长方形
+      .simple-upload-area {
         width: 100%;
-        height: 180px;
+        height: 100px;
         border: 2px dashed #dcdfe6;
         border-radius: 8px;
-        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
         background: #fafafa;
-        
-        &:hover {
+        outline: none;
+
+        &:hover,
+        &:focus {
           border-color: #409eff;
           background: #f0f7ff;
         }
-      }
 
-      .screenshot-preview-wrapper {
-        position: relative;
-        width: 100%;
-        height: 100%;
-
-        &:hover .screenshot-overlay {
-          opacity: 1;
-        }
-        
-        &:hover .delete-btn {
-          opacity: 1;
-        }
-      }
-
-      .screenshot-preview {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-        cursor: pointer;
-      }
-      
-      .delete-btn {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        background: rgba(0, 0, 0, 0.6);
-        border: none;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        transition: all 0.2s ease;
-        z-index: 10;
-        
-        .el-icon {
-          color: #fff;
-          font-size: 16px;
-        }
-        
-        &:hover {
-          background: #f56c6c;
-          transform: scale(1.1);
-        }
-      }
-
-      .screenshot-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.6);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        color: #fff;
-        opacity: 0;
-        transition: opacity 0.2s;
-
-        .overlay-icon {
-          font-size: 28px;
-          margin-bottom: 8px;
+        &:active {
+          border-color: #409eff;
+          background: #e6f2ff;
         }
 
-        .overlay-text {
-          font-size: 13px;
-          font-weight: 500;
-        }
-      }
-
-      .upload-placeholder {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        padding: 20px;
-
-        .upload-icon-box {
-          width: 56px;
-          height: 56px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+        .upload-content {
           display: flex;
+          flex-direction: column;
           align-items: center;
-          justify-content: center;
-          margin-bottom: 16px;
-          box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+          gap: 4px;
 
-          .upload-icon {
-            font-size: 28px;
-            color: #fff;
-          }
-        }
-
-        .upload-text {
-          font-size: 14px;
-          color: #303133;
-          font-weight: 500;
-          margin-bottom: 6px;
-        }
-
-        .upload-hint {
-          font-size: 12px;
-          color: #909399;
-        }
-      }
-
-      .card-footer {
-        margin-top: 12px;
-        display: flex;
-        justify-content: center;
-
-        .status-badge {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 14px;
-          border-radius: 20px;
-          font-size: 12px;
-
-          &.success {
-            background: #f0f9eb;
-            color: #67c23a;
-            border: 1px solid #c2e7b0;
+          .upload-main-icon {
+            font-size: 24px;
+            color: #409eff;
           }
 
-          &.pending {
-            background: #fdf6ec;
-            color: #e6a23c;
-            border: 1px solid #faecd8;
+          .upload-main-text {
+            font-size: 14px;
+            color: #606266;
+          }
+
+          .upload-sub-text {
+            font-size: 12px;
+            color: #909399;
           }
         }
       }
@@ -2988,12 +2793,12 @@ onUnmounted(() => {
       align-items: center;
       justify-content: center;
       gap: 6px;
-      margin-top: 16px;
-      padding: 10px 16px;
+      margin-top: 12px;
+      padding: 8px 12px;
       background: #f4f4f5;
       border-radius: 4px;
       color: #606266;
-      font-size: 13px;
+      font-size: 12px;
 
       .el-icon {
         color: #909399;
@@ -3089,37 +2894,79 @@ onUnmounted(() => {
   }
 }
 
-// 订单详情截图展示
-.order-screenshots {
+.pause-confirm-content {
+  text-align: center;
+  padding: 20px 0 10px;
+
+  .pause-icon {
+    font-size: 48px;
+    color: #e6a23c;
+    margin-bottom: 16px;
+  }
+
+  .pause-tip {
+    font-size: 16px;
+    color: #303133;
+    margin: 0 0 8px;
+
+    strong {
+      color: #e6a23c;
+    }
+  }
+
+  .pause-sub-tip {
+    font-size: 13px;
+    color: #909399;
+    margin: 0;
+  }
+}
+
+.detail-screenshot-list {
   display: flex;
-  gap: 20px;
   flex-wrap: wrap;
+  gap: 12px;
   
-  .screenshot-item {
+  .detail-screenshot-img {
+    width: 160px;
+    height: 110px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid #e4e7ed;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      border-color: #409eff;
+      box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+      transform: translateY(-2px);
+    }
+  }
+}
+
+.image-preview-dialog {
+  :deep(.el-dialog) {
+    max-width: 90vw;
+    max-height: 90vh;
+    background: transparent;
+    box-shadow: none;
+  }
+  
+  :deep(.el-dialog__header) {
+    display: none;
+  }
+  
+  :deep(.el-dialog__body) {
+    padding: 0;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    
-    .screenshot-label {
-      font-size: 13px;
-      color: #606266;
-      margin-bottom: 8px;
-      font-weight: 500;
-    }
-    
-    .screenshot-image {
-      width: 200px;
-      height: 150px;
-      border-radius: 8px;
-      border: 1px solid #dcdfe6;
-      cursor: pointer;
-      transition: all 0.3s;
-      
-      &:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        transform: scale(1.02);
-      }
-    }
+    justify-content: center;
+  }
+  
+  .preview-image {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 8px;
   }
 }
 
@@ -3448,18 +3295,16 @@ onUnmounted(() => {
     .screenshot-section {
       padding: 12px;
 
-      .screenshot-container {
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-      }
+      .simple-screenshot-container {
+        .screenshot-preview-list {
+          .screenshot-preview-item {
+            width: 100px;
+            height: 70px;
+          }
+        }
 
-      .screenshot-card {
-        width: 100%;
-        max-width: 320px;
-
-        .upload-area {
-          height: 140px;
+        .simple-upload-area {
+          height: 80px;
         }
       }
     }
@@ -3486,14 +3331,12 @@ onUnmounted(() => {
     }
   }
 
-  .order-screenshots {
-    flex-direction: column;
-    align-items: center;
-
-    .screenshot-image {
-      width: 100%;
-      max-width: 280px;
-      height: 120px;
+  .detail-screenshot-list {
+    justify-content: center;
+    
+    .detail-screenshot-img {
+      width: 140px;
+      height: 95px;
     }
   }
 

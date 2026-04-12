@@ -486,7 +486,7 @@ public class OrderService {
 
             // 保存截图URL
             if (request.getScreenshotUrls() != null && !request.getScreenshotUrls().isEmpty()) {
-                // 新的多张截图格式
+                order.setScreenshotUrls(String.join(",", request.getScreenshotUrls()));
                 order.setStartScreenshotUrl(request.getScreenshotUrls().get(0));
                 if (request.getScreenshotUrls().size() > 1) {
                     order.setEndScreenshotUrl(request.getScreenshotUrls().get(1));
@@ -498,6 +498,12 @@ public class OrderService {
                 }
                 if (request.getEndScreenshotUrl() != null) {
                     order.setEndScreenshotUrl(request.getEndScreenshotUrl());
+                }
+                if (order.getStartScreenshotUrl() != null) {
+                    String urls = order.getEndScreenshotUrl() != null
+                        ? order.getStartScreenshotUrl() + "," + order.getEndScreenshotUrl()
+                        : order.getStartScreenshotUrl();
+                    order.setScreenshotUrls(urls);
                 }
             }
 
@@ -617,6 +623,11 @@ public class OrderService {
                 
                 deleteScreenshotFile(order.getStartScreenshotUrl());
                 deleteScreenshotFile(order.getEndScreenshotUrl());
+                if (order.getScreenshotUrls() != null && !order.getScreenshotUrls().isEmpty()) {
+                    for (String url : order.getScreenshotUrls().split(",")) {
+                        deleteScreenshotFile(url);
+                    }
+                }
                 
                 orderRepository.delete(order);
             }

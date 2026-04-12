@@ -122,6 +122,9 @@ public class Order {
     @Column(name = "end_screenshot_url", length = 500)
     private String endScreenshotUrl;
 
+    @Column(name = "screenshot_urls", columnDefinition = "TEXT")
+    private String screenshotUrls;
+
     public enum Status {
         PENDING_ASSIGN,    // 0: 待分配
         PENDING_ACCEPT,    // 1: 待接单（单人）/ 待接单1（双人第一个）

@@ -68,4 +68,5 @@ public class OrderResponse {
     // 完成订单截图
     private String startScreenshotUrl;
     private String endScreenshotUrl;
+    private List<String> screenshotUrls;
 }
