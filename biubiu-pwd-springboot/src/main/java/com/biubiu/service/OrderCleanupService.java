@@ -42,8 +42,26 @@ public class OrderCleanupService {
      * 删除订单关联的截图文件
      */
     private void deleteOrderScreenshots(Order order) {
+        // 删除旧字段的截图（兼容旧数据）
         deleteScreenshotFile(order.getStartScreenshotUrl());
         deleteScreenshotFile(order.getEndScreenshotUrl());
+
+        // 删除新字段的多张截图（逗号分隔的URL列表）
+        deleteMultipleScreenshots(order.getScreenshotUrls());
+    }
+
+    /**
+     * 删除多张截图文件（逗号分隔的URL列表）
+     */
+    private void deleteMultipleScreenshots(String screenshotUrls) {
+        if (screenshotUrls == null || screenshotUrls.isEmpty()) {
+            return;
+        }
+        // screenshotUrls 格式: "/uploads/1.jpg,/uploads/2.jpg,/uploads/3.jpg"
+        String[] urls = screenshotUrls.split(",");
+        for (String url : urls) {
+            deleteScreenshotFile(url.trim());
+        }
     }
 
     /**

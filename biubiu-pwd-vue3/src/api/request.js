@@ -33,9 +33,10 @@ request.interceptors.response.use(
     const { response } = error
     if (response?.status === 401) {
       const userStore = useUserStore()
+      const msg = response?.data?.message || '登录已过期，请重新登录'
       userStore.logout()
       window.location.href = '/login'
-      ElMessage.error('登录已过期，请重新登录')
+      ElMessage.error(msg)
     } else if (response?.data?.message) {
       ElMessage.error(response.data.message)
     } else if (!response || error.code === 'ECONNABORTED') {

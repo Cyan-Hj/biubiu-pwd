@@ -24,6 +24,11 @@
           <span>首页概览</span>
         </el-menu-item>
 
+        <el-menu-item v-if="isPlayer || isAdmin || isCustomerService" index="/grab-hall" class="menu-item">
+          <el-icon><Tickets /></el-icon>
+          <span>抢单大厅</span>
+        </el-menu-item>
+
         <el-menu-item index="/orders" class="menu-item">
           <el-icon><List /></el-icon>
           <span>订单管理</span>
@@ -56,7 +61,7 @@
       </el-menu>
 
       <div class="aside-footer">
-        <div class="version">v1.0.0</div>
+        <div class="version">v2.0.0</div>
       </div>
     </el-aside>
 
@@ -94,6 +99,11 @@
             <span>首页概览</span>
           </el-menu-item>
 
+          <el-menu-item v-if="isPlayer || isAdmin || isCustomerService" index="/grab-hall" class="menu-item">
+            <el-icon><Tickets /></el-icon>
+            <span>抢单大厅</span>
+          </el-menu-item>
+
           <el-menu-item index="/orders" class="menu-item">
             <el-icon><List /></el-icon>
             <span>订单管理</span>
@@ -126,7 +136,7 @@
         </el-menu>
 
         <div class="aside-footer">
-          <div class="version">v1.0.0</div>
+          <div class="version">v2.0.0</div>
         </div>
       </div>
     </el-drawer>
@@ -179,7 +189,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { 
   HomeFilled, UserFilled, List, Money, Check, Setting, 
-  ArrowDown, User, SwitchButton, Expand
+  ArrowDown, User, SwitchButton, Expand, Tickets
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -187,6 +197,7 @@ const userStore = useUserStore()
 
 const isAdmin = computed(() => userStore.isAdmin)
 const isCustomerService = computed(() => userStore.isCustomerService)
+const isPlayer = computed(() => userStore.isPlayer)
 
 const isMobile = ref(false)
 const drawerVisible = ref(false)

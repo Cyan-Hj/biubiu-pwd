@@ -76,22 +76,35 @@ public class GrabOrderService {
         if ("huhang".equals(order.getOrderType())) {
             return true;
         }
-        LevelPrice orderLevel = getMaxLevelByPrice(order.getPricePerHour());
+        // 从serviceContent中解析订单等级（格式："等级名称陪玩【注意事项】"）
+        String orderLevelName = extractLevelFromServiceContent(order.getServiceContent());
+        if (orderLevelName == null) return true;
+
+        LevelPrice orderLevel = levelPriceRepository.findByLevel(orderLevelName).orElse(null);
         if (orderLevel == null) return true;
+
         LevelPrice playerLevel = levelPriceRepository.findByLevel(player.getLevel()).orElse(null);
         if (playerLevel == null) return false;
+
+        // 按照sortOrder判断等级高低：sortOrder越大，等级越高
         return playerLevel.getSortOrder() >= orderLevel.getSortOrder();
     }
 
-    private LevelPrice getMaxLevelByPrice(BigDecimal pricePerHour) {
-        List<LevelPrice> allLevels = levelPriceRepository.findAllByOrderBySortOrderAsc();
-        LevelPrice result = null;
-        for (LevelPrice lp : allLevels) {
-            if (lp.getDefaultPrice().compareTo(pricePerHour) <= 0) {
-                result = lp;
-            }
+    /**
+     * 从serviceContent中解析等级名称
+     * serviceContent格式："等级名称陪玩【注意事项】"，如"机密娱乐陪玩【要求开麦】"
+     */
+    private String extractLevelFromServiceContent(String serviceContent) {
+        if (serviceContent == null || serviceContent.isEmpty()) {
+            return null;
         }
-        return result;
+        // 获取所有等级名称，按长度降序排列（优先匹配长名称，避免"机密"匹配到"机密娱乐"）
+        List<LevelPrice> allLevels = levelPriceRepository.findAllByOrderBySortOrderAsc();
+        return allLevels.stream()
+                .map(LevelPrice::getLevel)
+                .filter(level -> serviceContent.startsWith(level + "陪玩"))
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean isHighPriorityPlayer(Order order, User player) {

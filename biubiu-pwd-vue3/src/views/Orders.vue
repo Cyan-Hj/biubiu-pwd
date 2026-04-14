@@ -1125,7 +1125,14 @@ const assignFilter = reactive({
 
 const assignFilterLevels = computed(() => {
   const levels = [...new Set(availablePlayers.value.map(p => p.level).filter(Boolean))]
-  return levels.sort()
+  // 按照系统设置的等级排序（sortOrder）进行排序
+  return levels.sort((a, b) => {
+    const levelA = levelPrices.value.find(l => l.level === a)
+    const levelB = levelPrices.value.find(l => l.level === b)
+    const sortOrderA = levelA ? levelA.sortOrder : 999999
+    const sortOrderB = levelB ? levelB.sortOrder : 999999
+    return sortOrderA - sortOrderB
+  })
 })
 
 const filteredPlayers = computed(() => {
