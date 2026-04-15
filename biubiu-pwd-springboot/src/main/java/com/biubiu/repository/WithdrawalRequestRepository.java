@@ -17,6 +17,8 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
     @Query("SELECT w FROM WithdrawalRequest w WHERE w.player.id = :playerId ORDER BY w.createdAt DESC")
     List<WithdrawalRequest> findByPlayerId(@Param("playerId") Long playerId);
 
+    List<WithdrawalRequest> findAllByOrderByCreatedAtDesc();
+
     long countByStatus(WithdrawalRequest.Status status);
 
     long countByPlayerId(Long playerId);

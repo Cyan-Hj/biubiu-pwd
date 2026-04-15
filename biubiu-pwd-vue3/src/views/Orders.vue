@@ -47,6 +47,25 @@
               </el-radio-button>
             </el-radio-group>
             <el-button
+              v-if="isAdmin"
+              type="warning"
+              class="create-btn"
+              @click="replenishDialogVisible = true"
+            >
+              <el-icon><RefreshLeft /></el-icon>
+              补单
+            </el-button>
+            <el-button
+              v-if="isAdmin"
+              type="info"
+              plain
+              class="create-btn"
+              @click="handleViewDeletedBackups"
+            >
+              <el-icon><Delete /></el-icon>
+              已删除记录
+            </el-button>
+            <el-button
               v-if="isAdmin || isCustomerService"
               type="primary"
               class="create-btn"
@@ -258,7 +277,8 @@
           <el-table-column v-if="isAdmin" type="selection" width="55" />
           <el-table-column prop="orderNo" label="订单号" width="150">
             <template #default="{ row }">
-              <span class="order-no-text">{{ row.orderNo }}</span>
+              <span :class="['order-no-text', { 'replenish-order': row.remark?.includes('【补单】') }]">{{ row.orderNo }}</span>
+              <el-tag v-if="row.remark?.includes('【补单】')" size="small" type="warning" style="margin-left: 4px">补单</el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="bossInfo" label="老板信息" min-width="140" show-overflow-tooltip />
@@ -964,14 +984,107 @@
         <el-button @click="detailDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 补单对话框 -->
+    <el-dialog v-model="replenishDialogVisible" title="补单（仅记录，不影响财务）" width="600px" class="order-dialog">
+      <el-alert type="warning" :closable="false" style="margin-bottom: 16px">
+        补单仅创建订单记录，不会触发任何财务计算（陪玩师收入、老板余额、财务记录等均不受影响）。
+      </el-alert>
+      <el-form :model="replenishForm" ref="replenishFormRef" label-width="110px" class="order-form">
+        <el-form-item label="原始订单号">
+          <el-input v-model="replenishForm.originalOrderNo" placeholder="可选，填写原始订单号便于追溯" />
+        </el-form-item>
+        <el-form-item label="老板信息" required>
+          <el-input v-model="replenishForm.bossInfo" placeholder="请输入老板信息" />
+        </el-form-item>
+        <el-form-item label="服务内容" required>
+          <el-input v-model="replenishForm.serviceContent" placeholder="请输入服务内容" />
+        </el-form-item>
+        <el-form-item label="订单类型">
+          <el-radio-group v-model="replenishForm.orderType">
+            <el-radio-button label="peiwand">陪玩单</el-radio-button>
+            <el-radio-button label="huhang">护航单</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="单人/双人">
+          <el-radio-group v-model="replenishForm.playerCount">
+            <el-radio-button label="single">单人</el-radio-button>
+            <el-radio-button label="double">双人</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="服务时长(小时)" required>
+          <el-input-number v-model="replenishForm.serviceHours" :min="0.5" :step="0.5" :precision="1" />
+        </el-form-item>
+        <el-form-item label="单价(元/小时)" required>
+          <el-input-number v-model="replenishForm.pricePerHour" :min="0" :precision="2" />
+        </el-form-item>
+        <el-form-item label="总金额" required>
+          <el-input-number v-model="replenishForm.totalAmount" :min="0" :precision="2" />
+        </el-form-item>
+        <el-form-item label="实际时长(小时)">
+          <el-input-number v-model="replenishForm.actualHours" :min="0" :step="0.5" :precision="1" placeholder="不填则使用服务时长" />
+        </el-form-item>
+        <el-form-item label="陪玩师">
+          <el-select v-model="replenishForm.currentPlayerId" placeholder="选择陪玩师（可选）" clearable filterable style="width: 100%">
+            <el-option v-for="p in availablePlayers" :key="p.id" :label="p.nickname + (p.level ? ' (' + p.level + ')' : '')" :value="p.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="replenishForm.playerCount === 'double'" label="陪玩师2">
+          <el-select v-model="replenishForm.currentPlayer2Id" placeholder="选择第二位陪玩师（可选）" clearable filterable style="width: 100%">
+            <el-option v-for="p in availablePlayers" :key="p.id" :label="p.nickname + (p.level ? ' (' + p.level + ')' : '')" :value="p.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="原始创建时间">
+          <el-date-picker v-model="replenishForm.originalCreatedAt" type="datetime" placeholder="可选，填写原始订单的创建时间" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="原始完成时间">
+          <el-date-picker v-model="replenishForm.originalCompletedAt" type="datetime" placeholder="可选，填写原始订单的完成时间" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="replenishForm.remark" type="textarea" :rows="2" placeholder="备注信息" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="replenishDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitReplenish" :loading="replenishLoading">确认补单</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 已删除订单记录对话框 -->
+    <el-dialog v-model="deletedBackupsDialogVisible" title="已删除订单记录" width="900px" class="order-dialog">
+      <el-table :data="deletedBackups" v-loading="deletedBackupsLoading" stripe max-height="500">
+        <el-table-column prop="orderNo" label="订单号" width="160" />
+        <el-table-column prop="bossInfo" label="老板信息" width="120" show-overflow-tooltip />
+        <el-table-column prop="serviceContent" label="服务内容" width="150" show-overflow-tooltip />
+        <el-table-column label="金额" width="100">
+          <template #default="{ row }">¥{{ row.totalAmount }}</template>
+        </el-table-column>
+        <el-table-column prop="status" label="删除时状态" width="100" />
+        <el-table-column label="陪玩师" width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.currentPlayerNickname || '-' }}
+            <template v-if="row.currentPlayer2Nickname"> / {{ row.currentPlayer2Nickname }}</template>
+          </template>
+        </el-table-column>
+        <el-table-column label="删除时间" width="160">
+          <template #default="{ row }">{{ formatDate(row.deletedAt) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" @click="handleReplenishFromBackup(row)">补单</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!deletedBackupsLoading && deletedBackups.length === 0" description="暂无已删除订单记录" />
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { getOrders, getOrderById, getMyInServiceOrders, createOrder, updateOrder, assignOrder, acceptOrder, completeOrder, cancelOrder, pauseOrder, resumeOrder, batchDeleteOrders } from '@/api/orders'
+import { getOrders, getOrderById, getMyInServiceOrders, createOrder, updateOrder, assignOrder, acceptOrder, completeOrder, cancelOrder, pauseOrder, resumeOrder, batchDeleteOrders, replenishOrder, getDeletedBackups, getDeletedBackup } from '@/api/orders'
 import { publishToHall, withdrawFromHall } from '@/api/grabHall'
 import { getPlayers } from '@/api/users'
 import { getLevelPrices, getSystemOptions } from '@/api/system'
@@ -1080,6 +1193,30 @@ const currentOrder = ref(null)
 const createFormRef = ref()
 const cancelFormRef = ref()
 const selectedOrders = ref([])
+
+const replenishDialogVisible = ref(false)
+const replenishLoading = ref(false)
+const replenishFormRef = ref()
+const replenishForm = reactive({
+  originalOrderNo: '',
+  bossInfo: '',
+  serviceContent: '',
+  orderType: 'peiwand',
+  playerCount: 'single',
+  serviceHours: 1,
+  pricePerHour: 50,
+  totalAmount: 50,
+  actualHours: null,
+  currentPlayerId: null,
+  currentPlayer2Id: null,
+  originalCreatedAt: null,
+  originalCompletedAt: null,
+  remark: ''
+})
+
+const deletedBackupsDialogVisible = ref(false)
+const deletedBackupsLoading = ref(false)
+const deletedBackups = ref([])
 
 const createForm = reactive({
   boss_info: '',
@@ -2076,6 +2213,88 @@ const submitPause = async () => {
   }
 }
 
+const handleViewDeletedBackups = async () => {
+  deletedBackupsDialogVisible.value = true
+  deletedBackupsLoading.value = true
+  try {
+    const res = await getDeletedBackups()
+    deletedBackups.value = res.data || []
+  } catch (error) {
+    ElMessage.error('获取已删除记录失败')
+  } finally {
+    deletedBackupsLoading.value = false
+  }
+}
+
+const handleReplenishFromBackup = (backup) => {
+  replenishForm.originalOrderNo = backup.orderNo || ''
+  replenishForm.bossInfo = backup.bossInfo || ''
+  replenishForm.serviceContent = backup.serviceContent || ''
+  replenishForm.orderType = backup.orderType || 'peiwand'
+  replenishForm.playerCount = backup.playerCount || 'single'
+  replenishForm.serviceHours = backup.serviceHours || 1
+  replenishForm.pricePerHour = backup.pricePerHour || 50
+  replenishForm.totalAmount = backup.totalAmount || 50
+  replenishForm.actualHours = backup.actualHours || null
+  replenishForm.currentPlayerId = backup.currentPlayerId || null
+  replenishForm.currentPlayer2Id = backup.currentPlayer2Id || null
+  replenishForm.originalCreatedAt = backup.createdAt || null
+  replenishForm.originalCompletedAt = backup.completedAt || null
+  replenishForm.remark = ''
+  deletedBackupsDialogVisible.value = false
+  replenishDialogVisible.value = true
+}
+
+const submitReplenish = async () => {
+  if (!replenishForm.bossInfo || !replenishForm.serviceContent) {
+    ElMessage.warning('请填写老板信息和服务内容')
+    return
+  }
+
+  replenishLoading.value = true
+  try {
+    await replenishOrder({
+      bossInfo: replenishForm.bossInfo,
+      serviceContent: replenishForm.serviceContent,
+      serviceHours: replenishForm.serviceHours,
+      pricePerHour: replenishForm.pricePerHour,
+      totalAmount: replenishForm.totalAmount,
+      actualHours: replenishForm.actualHours,
+      orderType: replenishForm.orderType,
+      playerCount: replenishForm.playerCount,
+      currentPlayerId: replenishForm.currentPlayerId,
+      currentPlayer2Id: replenishForm.currentPlayer2Id,
+      originalOrderNo: replenishForm.originalOrderNo,
+      originalCreatedAt: replenishForm.originalCreatedAt ? dayjs(replenishForm.originalCreatedAt).format('YYYY-MM-DDTHH:mm:ss') : null,
+      originalCompletedAt: replenishForm.originalCompletedAt ? dayjs(replenishForm.originalCompletedAt).format('YYYY-MM-DDTHH:mm:ss') : null,
+      remark: replenishForm.remark
+    })
+    ElMessage.success('补单成功')
+    replenishDialogVisible.value = false
+    Object.assign(replenishForm, {
+      originalOrderNo: '',
+      bossInfo: '',
+      serviceContent: '',
+      orderType: 'peiwand',
+      playerCount: 'single',
+      serviceHours: 1,
+      pricePerHour: 50,
+      totalAmount: 50,
+      actualHours: null,
+      currentPlayerId: null,
+      currentPlayer2Id: null,
+      originalCreatedAt: null,
+      originalCompletedAt: null,
+      remark: ''
+    })
+    loadOrders()
+  } catch (error) {
+    ElMessage.error('补单失败')
+  } finally {
+    replenishLoading.value = false
+  }
+}
+
 const handleResume = async (row) => {
   try {
     await ElMessageBox.confirm(
@@ -2235,12 +2454,22 @@ const stopAutoRefresh = () => {
   }
 }
 
+watch(replenishDialogVisible, async (val) => {
+  if (val) {
+    try {
+      const res = await getPlayers({ status: 'active', pageSize: 1000 })
+      availablePlayers.value = res.data?.list || res.data || []
+    } catch (e) {
+      // ignore
+    }
+  }
+})
+
 onMounted(() => {
   loadOrders()
   loadLevelPrices()
   loadPrecautions()
   loadServiceItems()
-  // 只有管理员和客服才需要加载老板和VIP等级数据
   if (!isPlayer.value) {
     loadBosses()
     loadVipLevels()
@@ -2248,7 +2477,6 @@ onMounted(() => {
   timerInterval = setInterval(() => {
     now.value = dayjs()
   }, 1000)
-  // 陪玩师启动自动刷新
   if (isPlayer.value) {
     startAutoRefresh()
   }
@@ -2519,6 +2747,10 @@ onUnmounted(() => {
     font-family: monospace;
     font-weight: 600;
     color: #409eff;
+  }
+
+  .replenish-order {
+    color: #e6a23c !important;
   }
   
   .time-price {

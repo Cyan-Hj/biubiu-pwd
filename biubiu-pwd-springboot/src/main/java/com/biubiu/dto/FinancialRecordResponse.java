@@ -18,4 +18,11 @@ public class FinancialRecordResponse {
     private String description;
     private LocalDateTime createdAt;
     private String playerNickname;
+    private String orderType;
+    private String remark;
+    private BigDecimal totalAmount;
+    private BigDecimal serviceHours;
+    private BigDecimal actualHours;
+    private BigDecimal pricePerHour;
+    private String bossInfo;
 }

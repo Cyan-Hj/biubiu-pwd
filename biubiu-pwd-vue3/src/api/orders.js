@@ -55,3 +55,15 @@ export const resumeOrder = (id) => {
 export const batchDeleteOrders = (ids) => {
   return request.delete('/orders/batch', { data: ids })
 }
+
+export const replenishOrder = (data) => {
+  return request.post('/orders/replenish', data)
+}
+
+export const getDeletedBackups = () => {
+  return request.get('/orders/deleted-backups')
+}
+
+export const getDeletedBackup = (orderNo) => {
+  return request.get(`/orders/deleted-backups/${orderNo}`)
+}

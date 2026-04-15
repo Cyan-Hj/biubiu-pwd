@@ -37,6 +37,7 @@ public class OrderCleanupService {
     private final FinancialRecordRepository financialRecordRepository;
     private final OperationLogRepository operationLogRepository;
     private final UserRepository userRepository;
+    private final DeletedOrderBackupService deletedOrderBackupService;
 
     /**
      * 删除订单关联的截图文件
@@ -126,7 +127,7 @@ public class OrderCleanupService {
         int screenshotCount = 0;
         
         for (Order order : ordersToDelete) {
-            // 删除关联的截图文件
+            deletedOrderBackupService.backupOrder(order);
             deleteOrderScreenshots(order);
             screenshotCount++;
             sessionCount += orderSessionRepository.deleteByOrderId(order.getId());
@@ -191,7 +192,7 @@ public class OrderCleanupService {
         int screenshotCount = 0;
         
         for (Order order : ordersToDelete) {
-            // 删除关联的截图文件
+            deletedOrderBackupService.backupOrder(order);
             deleteOrderScreenshots(order);
             screenshotCount++;
             sessionCount += orderSessionRepository.deleteByOrderId(order.getId());
@@ -201,7 +202,6 @@ public class OrderCleanupService {
         
         orderRepository.deleteAll(ordersToDelete);
         
-        // 如果启用了清除陪玩师累计收入，则清零所有陪玩师的累计收入
         int clearedPlayerCount = 0;
         if (Boolean.TRUE.equals(config.getClearPlayerIncome())) {
             clearedPlayerCount = clearAllPlayersIncome();
@@ -212,10 +212,6 @@ public class OrderCleanupService {
         return new CleanupResult(ordersToDelete.size(), sessionCount, financialCount, operationLogCount, clearedPlayerCount);
     }
     
-    /**
-     * 高级手动清理 - 支持自定义选项
-     * @param request 清理请求参数
-     */
     @Transactional
     public CleanupResult manualCleanupAdvanced(CleanupRequest request) {
         LocalDateTime cutoffDate = request.getCutoffDate();
@@ -245,7 +241,7 @@ public class OrderCleanupService {
         int screenshotCount = 0;
         
         for (Order order : ordersToDelete) {
-            // 删除关联的截图文件
+            deletedOrderBackupService.backupOrder(order);
             deleteOrderScreenshots(order);
             screenshotCount++;
             sessionCount += orderSessionRepository.deleteByOrderId(order.getId());

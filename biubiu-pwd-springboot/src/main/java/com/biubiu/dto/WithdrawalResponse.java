@@ -11,7 +11,10 @@ import java.time.LocalDateTime;
 @Builder
 public class WithdrawalResponse {
     private Long id;
+    private Long playerId;
+    private String playerNo;
     private String playerNickname;
+    private String playerPhone;
     private BigDecimal amount;
     private String paymentMethod;
     private String accountInfo;
@@ -19,4 +22,5 @@ public class WithdrawalResponse {
     private WithdrawalRequest.Status status;
     private String rejectReason;
     private LocalDateTime createdAt;
+    private LocalDateTime reviewedAt;
 }

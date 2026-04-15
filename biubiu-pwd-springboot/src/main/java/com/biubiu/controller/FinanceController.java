@@ -262,7 +262,7 @@ public class FinanceController {
     public ApiResponse<IncomeResponse> getIncome() {
         User currentUser = getCurrentUser();
 
-        BigDecimal totalIncome = financialRecordRepository.sumTotalIncomeByPlayerId(currentUser.getId());
+        BigDecimal totalIncome = currentUser.getTotalIncome();
         BigDecimal availableBalance = currentUser.getAvailableBalance();
 
         LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
@@ -348,6 +348,42 @@ public class FinanceController {
         return ApiResponse.success(list);
     }
 
+    @GetMapping("/withdraw/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<WithdrawalResponse>> getAllWithdrawals() {
+        List<WithdrawalRequest> withdrawals = withdrawalRequestRepository.findAllByOrderByCreatedAtDesc();
+
+        List<WithdrawalResponse> list = withdrawals.stream()
+                .map(this::convertToWithdrawalResponse)
+                .collect(Collectors.toList());
+
+        return ApiResponse.success(list);
+    }
+
+    @PostMapping("/withdraw/approve-all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Integer> approveAllPendingWithdrawals() {
+        User currentUser = getCurrentUser();
+        List<WithdrawalRequest> pendingList = withdrawalRequestRepository.findPendingRequests();
+        int count = 0;
+        for (WithdrawalRequest withdrawal : pendingList) {
+            withdrawal.setStatus(WithdrawalRequest.Status.approved);
+            withdrawal.setReviewedBy(currentUser);
+            withdrawal.setReviewedAt(LocalDateTime.now());
+
+            FinancialRecord record = new FinancialRecord();
+            record.setPlayer(withdrawal.getPlayer());
+            record.setType(FinancialRecord.Type.withdrawal);
+            record.setAmount(withdrawal.getAmount());
+            record.setDescription("提现到" + (withdrawal.getPaymentMethod() != null ? withdrawal.getPaymentMethod() : "") + "（审核通过）");
+            financialRecordRepository.save(record);
+
+            withdrawalRequestRepository.save(withdrawal);
+            count++;
+        }
+        return ApiResponse.success("批量审核通过 " + count + " 条", count);
+    }
+
     @PostMapping("/withdraw/{id}/review")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> reviewWithdrawal(
@@ -369,10 +405,18 @@ public class FinanceController {
 
         if (request.getStatus() == WithdrawalRequest.Status.rejected) {
             withdrawal.setRejectReason(request.getRejectReason());
-            // 退回金额
             User player = withdrawal.getPlayer();
             player.setAvailableBalance(player.getAvailableBalance().add(withdrawal.getAmount()));
             userRepository.save(player);
+        }
+
+        if (request.getStatus() == WithdrawalRequest.Status.approved) {
+            FinancialRecord record = new FinancialRecord();
+            record.setPlayer(withdrawal.getPlayer());
+            record.setType(FinancialRecord.Type.withdrawal);
+            record.setAmount(withdrawal.getAmount());
+            record.setDescription("提现到" + (withdrawal.getPaymentMethod() != null ? withdrawal.getPaymentMethod() : "") + "（审核通过）");
+            financialRecordRepository.save(record);
         }
 
         withdrawalRequestRepository.save(withdrawal);
@@ -390,13 +434,23 @@ public class FinanceController {
                 .description(record.getDescription())
                 .createdAt(record.getCreatedAt())
                 .playerNickname(record.getPlayer().getNickname())
+                .orderType(record.getOrder() != null ? record.getOrder().getOrderType() : null)
+                .remark(record.getOrder() != null ? record.getOrder().getRemark() : null)
+                .totalAmount(record.getOrder() != null ? record.getOrder().getTotalAmount() : null)
+                .serviceHours(record.getOrder() != null ? record.getOrder().getServiceHours() : null)
+                .actualHours(record.getOrder() != null ? record.getOrder().getActualHours() : null)
+                .pricePerHour(record.getOrder() != null ? record.getOrder().getPricePerHour() : null)
+                .bossInfo(record.getOrder() != null ? record.getOrder().getBossInfo() : null)
                 .build();
     }
 
     private WithdrawalResponse convertToWithdrawalResponse(WithdrawalRequest withdrawal) {
         return WithdrawalResponse.builder()
                 .id(withdrawal.getId())
+                .playerId(withdrawal.getPlayer().getId())
+                .playerNo(withdrawal.getPlayer().getPlayerNo())
                 .playerNickname(withdrawal.getPlayer().getNickname())
+                .playerPhone(withdrawal.getPlayer().getPhone())
                 .amount(withdrawal.getAmount())
                 .paymentMethod(withdrawal.getPaymentMethod())
                 .accountInfo(withdrawal.getAccountInfo())
@@ -404,6 +458,7 @@ public class FinanceController {
                 .status(withdrawal.getStatus())
                 .rejectReason(withdrawal.getRejectReason())
                 .createdAt(withdrawal.getCreatedAt())
+                .reviewedAt(withdrawal.getReviewedAt())
                 .build();
     }
 

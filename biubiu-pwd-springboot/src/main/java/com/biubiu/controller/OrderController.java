@@ -7,6 +7,7 @@ import com.biubiu.entity.User;
 import com.biubiu.repository.OrderRepository;
 import com.biubiu.repository.UserRepository;
 import com.biubiu.service.OrderService;
+import com.biubiu.service.DeletedOrderBackupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -39,6 +40,7 @@ public class OrderController {
     private final com.biubiu.repository.SystemConfigRepository systemConfigRepository;
     private final OrderService orderService;
     private final com.biubiu.service.GrabOrderService grabOrderService;
+    private final DeletedOrderBackupService deletedOrderBackupService;
 
     @GetMapping
     public ApiResponse<PageResponse<OrderResponse>> getOrders(
@@ -233,6 +235,30 @@ public class OrderController {
         User currentUser = getCurrentUser();
         grabOrderService.withdrawFromHall(id, currentUser);
         return ApiResponse.success("撤回成功", null);
+    }
+
+    @PostMapping("/replenish")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<OrderResponse> replenishOrder(@Valid @RequestBody ReplenishOrderRequest request) {
+        User currentUser = getCurrentUser();
+        Order saved = orderService.replenishOrder(request, currentUser);
+        return ApiResponse.success("补单创建成功", convertToResponse(saved));
+    }
+
+    @GetMapping("/deleted-backups")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<DeletedOrderBackupService.DeletedOrderBackup>> listDeletedBackups() {
+        return ApiResponse.success(deletedOrderBackupService.listBackups());
+    }
+
+    @GetMapping("/deleted-backups/{orderNo}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<DeletedOrderBackupService.DeletedOrderBackup> getDeletedBackup(@PathVariable String orderNo) {
+        DeletedOrderBackupService.DeletedOrderBackup backup = deletedOrderBackupService.getBackup(orderNo);
+        if (backup == null) {
+            return ApiResponse.error("未找到该订单的备份记录");
+        }
+        return ApiResponse.success(backup);
     }
 
     private OrderResponse convertToResponse(Order order) {

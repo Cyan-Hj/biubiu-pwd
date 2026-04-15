@@ -16,6 +16,14 @@ export const getPendingWithdrawals = () => {
   return request.get('/finance/withdraw/pending')
 }
 
+export const getAllWithdrawals = () => {
+  return request.get('/finance/withdraw/all')
+}
+
+export const approveAllWithdrawals = () => {
+  return request.post('/finance/withdraw/approve-all')
+}
+
 export const reviewWithdrawal = (id, data) => {
   return request.post(`/finance/withdraw/${id}/review`, data)
 }

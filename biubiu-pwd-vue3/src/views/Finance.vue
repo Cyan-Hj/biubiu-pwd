@@ -148,14 +148,71 @@
       </el-card>
     </div>
 
-    <!-- 陪玩师视图 - 暂不开放 -->
-    <div v-if="isPlayer" class="not-available-page">
-      <el-empty description="暂不开放此页面">
-        <template #image>
-          <el-icon class="not-available-icon"><Lock /></el-icon>
+    <!-- 陪玩师视图 -->
+    <div v-if="isPlayer">
+      <el-row :gutter="20" class="player-stats-row">
+        <el-col :xs="24" :sm="8">
+          <div class="stat-card primary">
+            <div class="stat-icon"><el-icon><Wallet /></el-icon></div>
+            <div class="stat-content">
+              <div class="stat-label">累计总收入</div>
+              <div class="stat-value">¥{{ formatNumber(incomeData.totalIncome) }}</div>
+            </div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :sm="8">
+          <div class="stat-card success">
+            <div class="stat-icon"><el-icon><CreditCard /></el-icon></div>
+            <div class="stat-content">
+              <div class="stat-label">可提现余额</div>
+              <div class="stat-value">¥{{ formatNumber(incomeData.availableBalance) }}</div>
+            </div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :sm="8">
+          <div class="stat-card info">
+            <div class="stat-icon"><el-icon><Calendar /></el-icon></div>
+            <div class="stat-content">
+              <div class="stat-label">今日收入</div>
+              <div class="stat-value">¥{{ formatNumber(incomeData.todayIncome) }}</div>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+
+      <!-- 提现 -->
+      <el-card class="withdraw-card">
+        <template #header>
+          <div class="card-header">
+            <span><el-icon><CreditCard /></el-icon> 申请提现</span>
+          </div>
         </template>
-        <p class="not-available-text">财务管理功能正在开发中，敬请期待</p>
-      </el-empty>
+        <el-form :model="withdrawForm" label-width="100px" class="withdraw-form">
+          <el-form-item label="提现金额">
+            <el-input-number v-model="withdrawForm.amount" :min="1" :max="incomeData.availableBalance || 1" :precision="2" :step="100" />
+            <div class="balance-tip">可提现余额: ¥{{ formatNumber(incomeData.availableBalance) }}</div>
+          </el-form-item>
+          <el-form-item label="收款方式">
+            <el-radio-group v-model="withdrawForm.paymentMethod">
+              <el-radio-button label="alipay">支付宝</el-radio-button>
+              <el-radio-button label="wechat">微信</el-radio-button>
+              <el-radio-button label="bank">银行卡</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="收款账号">
+            <el-input v-model="withdrawForm.accountInfo" placeholder="请输入收款账号" />
+          </el-form-item>
+          <el-form-item label="真实姓名">
+            <el-input v-model="withdrawForm.realName" placeholder="请输入真实姓名" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleWithdraw" :disabled="!canWithdraw" class="withdraw-btn">
+              <el-icon><Check /></el-icon>
+              提交提现申请
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
     </div>
 
     <!-- 收入明细 -->
@@ -164,7 +221,7 @@
         <div class="card-header">
           <span><el-icon><List /></el-icon> 收入明细</span>
           <div class="header-actions">
-            <el-radio-group v-model="recordTypeFilter" size="small" @change="loadRecords">
+            <el-radio-group v-model="recordTypeFilter" size="small">
               <el-radio-button label="">全部</el-radio-button>
               <el-radio-button label="income">收入</el-radio-button>
               <el-radio-button label="withdrawal">提现</el-radio-button>
@@ -172,7 +229,7 @@
           </div>
         </div>
       </template>
-      <el-table :data="filteredRecords" v-loading="loading" stripe class="records-table">
+      <el-table :data="filteredRecords" v-loading="loading" stripe class="records-table" row-key="id" max-height="600">
         <el-table-column v-if="isAdmin" prop="playerNickname" label="陪玩师" width="120">
           <template #default="{ row }">
             <div class="player-name">{{ row.playerNickname }}</div>
@@ -185,15 +242,14 @@
         </el-table-column>
         <el-table-column prop="type" label="类型" width="90">
           <template #default="{ row }">
-            <el-tag :type="row.type === 'income' ? 'success' : 'danger'" effect="light" size="small">
-              {{ row.type === 'income' ? '收入' : '提现' }}
-            </el-tag>
+            <el-tag v-if="row.type === 'income'" type="success" effect="light" size="small">收入</el-tag>
+            <el-tag v-else-if="row.type === 'withdrawal'" type="danger" effect="light" size="small">提现</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="amount" label="金额" width="130">
           <template #default="{ row }">
             <span class="amount-cell" :class="{ 'income': row.type === 'income', 'expense': row.type === 'withdrawal' }">
-              {{ row.type === 'income' ? '+' : '-' }}¥{{ formatNumber(row.amount) }}
+              {{ row.type === 'income' ? '+' : row.type === 'withdrawal' ? '-' : '' }}¥{{ formatNumber(row.amount) }}
             </span>
           </template>
         </el-table-column>
@@ -209,15 +265,6 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-pagination
-        v-model:current-page="page"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        class="pagination"
-        @change="loadRecords"
-      />
     </el-card>
   </div>
 </template>
@@ -485,8 +532,8 @@ const loadRecords = async () => {
   loading.value = true
   try {
     const res = await getIncomeRecords({
-      page: page.value,
-      pageSize: pageSize.value
+      page: 1,
+      pageSize: 9999
     })
     records.value = res.data?.list || []
     total.value = res.data?.total || 0
@@ -873,6 +920,11 @@ watch(() => adminStats.value, () => {
 .pagination {
   margin-top: 20px;
   justify-content: flex-end;
+}
+
+.expand-content {
+  padding: 16px 20px;
+  background: #fafbfc;
 }
 
 // 暂不开放页面样式

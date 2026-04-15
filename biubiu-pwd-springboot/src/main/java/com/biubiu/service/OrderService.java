@@ -3,6 +3,7 @@ package com.biubiu.service;
 import com.biubiu.dto.AssignOrderRequest;
 import com.biubiu.dto.CompleteOrderRequest;
 import com.biubiu.dto.CreateOrderRequest;
+import com.biubiu.dto.ReplenishOrderRequest;
 import com.biubiu.entity.*;
 import com.biubiu.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class OrderService {
     private final GrabWaitingPlayerRepository grabWaitingPlayerRepository;
     private final GrabPriorityWaitRepository grabPriorityWaitRepository;
     private final GrabCooldownRepository grabCooldownRepository;
+    private final DeletedOrderBackupService deletedOrderBackupService;
 
     @Transactional
     public Order createOrder(CreateOrderRequest request, User currentUser) {
@@ -625,6 +627,8 @@ public class OrderService {
         for (Long id : ids) {
             Order order = orderRepository.findById(id).orElse(null);
             if (order != null) {
+                deletedOrderBackupService.backupOrder(order);
+
                 List<OperationLog> logs = operationLogRepository.findByOrderIdOrderByCreatedAtDesc(id);
                 operationLogRepository.deleteAll(logs);
                 
@@ -823,5 +827,106 @@ public class OrderService {
         String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String random = String.format("%06d", new Random().nextInt(1000000));
         return "DD" + date + random;
+    }
+
+    @Transactional
+    public Order replenishOrder(ReplenishOrderRequest request, User currentUser) {
+        Order order = new Order();
+        order.setOrderNo(generateOrderNo());
+        order.setBossInfo(request.getBossInfo());
+        order.setServiceContent(request.getServiceContent());
+        order.setServiceHours(request.getServiceHours());
+        order.setPricePerHour(request.getPricePerHour());
+        order.setTotalAmount(request.getTotalAmount());
+        order.setScheduledTime(request.getScheduledTime());
+        order.setRemark(request.getRemark());
+        order.setStatus(Order.Status.COMPLETED);
+        order.setCreatedBy(currentUser);
+        order.setActualHours(request.getActualHours() != null ? request.getActualHours() : request.getServiceHours());
+        order.setCompletedAt(request.getOriginalCompletedAt() != null ? request.getOriginalCompletedAt() : LocalDateTime.now());
+        order.setStartedAt(request.getOriginalCreatedAt());
+        order.setCreatedAt(request.getOriginalCreatedAt());
+
+        if ("double".equalsIgnoreCase(request.getPlayerCount())) {
+            order.setPlayerCount(Order.PlayerCount.DOUBLE);
+        } else {
+            order.setPlayerCount(Order.PlayerCount.SINGLE);
+        }
+
+        order.setOrderType(request.getOrderType());
+
+        if (request.getCustomerType() != null) {
+            order.setCustomerType(Order.CustomerType.valueOf(request.getCustomerType()));
+        } else {
+            order.setCustomerType(Order.CustomerType.SCATTER);
+        }
+
+        if (request.getBossId() != null && order.getCustomerType() == Order.CustomerType.REGULAR) {
+            Boss boss = bossRepository.findById(request.getBossId())
+                    .orElseThrow(() -> new RuntimeException("老板不存在"));
+            order.setBoss(boss);
+        }
+
+        if (request.getCurrentPlayerId() != null) {
+            User player = userRepository.findById(request.getCurrentPlayerId())
+                    .orElseThrow(() -> new RuntimeException("陪玩师不存在"));
+            order.setCurrentPlayer(player);
+            order.setAssignedBy(currentUser);
+            order.setAssignedAt(order.getCreatedAt());
+        }
+
+        if (request.getCurrentPlayer2Id() != null) {
+            User player2 = userRepository.findById(request.getCurrentPlayer2Id())
+                    .orElseThrow(() -> new RuntimeException("陪玩师2不存在"));
+            order.setCurrentPlayer2(player2);
+        }
+
+        if (request.getRemark() == null || request.getRemark().isEmpty()) {
+            String originalNo = request.getOriginalOrderNo() != null ? request.getOriginalOrderNo() : "未知";
+            order.setRemark("【补单】原始订单号: " + originalNo);
+        } else {
+            order.setRemark(request.getRemark() + "【补单】原始订单号: " + (request.getOriginalOrderNo() != null ? request.getOriginalOrderNo() : "未知"));
+        }
+
+        Order saved = orderRepository.save(order);
+
+        BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
+                .map(SystemConfig::getPlatformFeeRate)
+                .orElse(BigDecimal.valueOf(0.2));
+        BigDecimal totalPlayerIncome = saved.getTotalAmount().multiply(BigDecimal.ONE.subtract(platformFeeRate));
+
+        if (saved.getCurrentPlayer() != null) {
+            BigDecimal income;
+            String desc;
+            if (saved.getPlayerCount() == Order.PlayerCount.DOUBLE && saved.getCurrentPlayer2() != null) {
+                income = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+                desc = "订单收入 (单号: " + saved.getOrderNo() + ", 双人订单对半分)";
+            } else {
+                income = totalPlayerIncome;
+                desc = "订单收入 (单号: " + saved.getOrderNo() + ")";
+            }
+            FinancialRecord record = new FinancialRecord();
+            record.setOrder(saved);
+            record.setPlayer(saved.getCurrentPlayer());
+            record.setType(FinancialRecord.Type.income);
+            record.setAmount(income);
+            record.setDescription(desc);
+            financialRecordRepository.save(record);
+        }
+
+        if (saved.getCurrentPlayer2() != null) {
+            BigDecimal income = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+            FinancialRecord record2 = new FinancialRecord();
+            record2.setOrder(saved);
+            record2.setPlayer(saved.getCurrentPlayer2());
+            record2.setType(FinancialRecord.Type.income);
+            record2.setAmount(income);
+            record2.setDescription("订单收入 (单号: " + saved.getOrderNo() + ", 双人订单对半分)");
+            financialRecordRepository.save(record2);
+        }
+
+        logOperation(saved, currentUser, "REPLENISH", null, Order.Status.COMPLETED,
+                "补单创建，原始订单号: " + (request.getOriginalOrderNo() != null ? request.getOriginalOrderNo() : "未知"));
+        return saved;
     }
 }
