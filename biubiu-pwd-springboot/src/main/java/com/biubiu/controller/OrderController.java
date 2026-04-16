@@ -214,7 +214,7 @@ public class OrderController {
         return ApiResponse.success("订单完成", null);
     }
 
-    @DeleteMapping("/batch")
+    @PostMapping("/batch")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> batchDeleteOrders(@RequestBody List<Long> ids) {
         orderService.batchDeleteOrders(ids);

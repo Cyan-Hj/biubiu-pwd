@@ -479,6 +479,46 @@ public class OrderService {
         currentSession.setActualHours(currentHours);
         orderSessionRepository.save(currentSession);
 
+        // 保存当前陪玩师的截图（追加模式 + 去重，确保双人订单各自的截图都能保存且不重复）
+        java.util.Set<String> allUrls = new java.util.HashSet<>();
+        if (order.getScreenshotUrls() != null && !order.getScreenshotUrls().isEmpty()) {
+            for (String url : order.getScreenshotUrls().split(",")) {
+                if (!url.trim().isEmpty()) allUrls.add(url.trim());
+            }
+        }
+        if (request.getScreenshotUrls() != null && !request.getScreenshotUrls().isEmpty()) {
+            for (String url : request.getScreenshotUrls()) {
+                if (!url.trim().isEmpty()) allUrls.add(url.trim());
+            }
+        }
+        if (!allUrls.isEmpty()) {
+            order.setScreenshotUrls(String.join(",", allUrls));
+        }
+
+        java.util.Set<String> allStartUrls = new java.util.HashSet<>();
+        if (order.getStartScreenshotUrl() != null && !order.getStartScreenshotUrl().isEmpty()) {
+            allStartUrls.add(order.getStartScreenshotUrl().trim());
+        }
+        if (request.getScreenshotUrls() != null && !request.getScreenshotUrls().isEmpty()) {
+            allStartUrls.add(request.getScreenshotUrls().get(0));
+        }
+        if (!allStartUrls.isEmpty()) {
+            order.setStartScreenshotUrl(allStartUrls.iterator().next());
+        }
+
+        java.util.Set<String> allEndUrls = new java.util.HashSet<>();
+        if (order.getEndScreenshotUrl() != null && !order.getEndScreenshotUrl().isEmpty()) {
+            allEndUrls.add(order.getEndScreenshotUrl().trim());
+        }
+        if (request.getScreenshotUrls() != null && request.getScreenshotUrls().size() > 1) {
+            allEndUrls.add(request.getScreenshotUrls().get(1));
+        }
+        if (!allEndUrls.isEmpty()) {
+            order.setEndScreenshotUrl(allEndUrls.iterator().next());
+        }
+
+        orderRepository.save(order);
+
         // 检查是否还有其他陪玩师没有完成
         List<OrderSession> allSessions = orderSessionRepository.findByOrderId(order.getId());
         long activeSessions = allSessions.stream().filter(s -> s.getEndedAt() == null).count();
@@ -499,26 +539,46 @@ public class OrderService {
             }
             order.setActualHours(totalActualHours);
 
-            // 保存截图URL
+            // 保存截图URL（追加模式，避免双人订单覆盖）
             if (request.getScreenshotUrls() != null && !request.getScreenshotUrls().isEmpty()) {
-                order.setScreenshotUrls(String.join(",", request.getScreenshotUrls()));
-                order.setStartScreenshotUrl(request.getScreenshotUrls().get(0));
-                if (request.getScreenshotUrls().size() > 1) {
+                String existingUrls = order.getScreenshotUrls();
+                String newUrls = String.join(",", request.getScreenshotUrls());
+                if (existingUrls != null && !existingUrls.isEmpty()) {
+                    order.setScreenshotUrls(existingUrls + "," + newUrls);
+                } else {
+                    order.setScreenshotUrls(newUrls);
+                }
+                if (order.getStartScreenshotUrl() == null && !request.getScreenshotUrls().isEmpty()) {
+                    order.setStartScreenshotUrl(request.getScreenshotUrls().get(0));
+                }
+                if (order.getEndScreenshotUrl() == null && request.getScreenshotUrls().size() > 1) {
                     order.setEndScreenshotUrl(request.getScreenshotUrls().get(1));
                 }
             } else {
                 // 兼容旧版本
                 if (request.getStartScreenshotUrl() != null) {
-                    order.setStartScreenshotUrl(request.getStartScreenshotUrl());
+                    String existingUrls = order.getScreenshotUrls();
+                    String newUrl = request.getStartScreenshotUrl();
+                    if (existingUrls != null && !existingUrls.isEmpty()) {
+                        order.setScreenshotUrls(existingUrls + "," + newUrl);
+                    } else {
+                        order.setScreenshotUrls(newUrl);
+                    }
+                    if (order.getStartScreenshotUrl() == null) {
+                        order.setStartScreenshotUrl(newUrl);
+                    }
                 }
                 if (request.getEndScreenshotUrl() != null) {
-                    order.setEndScreenshotUrl(request.getEndScreenshotUrl());
-                }
-                if (order.getStartScreenshotUrl() != null) {
-                    String urls = order.getEndScreenshotUrl() != null
-                        ? order.getStartScreenshotUrl() + "," + order.getEndScreenshotUrl()
-                        : order.getStartScreenshotUrl();
-                    order.setScreenshotUrls(urls);
+                    String existingUrls = order.getScreenshotUrls();
+                    String newUrl = request.getEndScreenshotUrl();
+                    if (existingUrls != null && !existingUrls.isEmpty()) {
+                        order.setScreenshotUrls(existingUrls + "," + newUrl);
+                    } else {
+                        order.setScreenshotUrls(newUrl);
+                    }
+                    if (order.getEndScreenshotUrl() == null) {
+                        order.setEndScreenshotUrl(newUrl);
+                    }
                 }
             }
 
@@ -562,7 +622,9 @@ public class OrderService {
                 BigDecimal incomePerPerson = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
                 
                 for (OrderSession session : allSessions) {
-                    if (session.getActualHours() == null || session.getActualHours().compareTo(BigDecimal.ZERO) <= 0) continue;
+                    if (!"huhang".equals(order.getOrderType())) {
+                        if (session.getActualHours() == null || session.getActualHours().compareTo(BigDecimal.ZERO) <= 0) continue;
+                    }
 
                     User player = session.getPlayer();
                     player.setTotalIncome(player.getTotalIncome().add(incomePerPerson));
@@ -581,7 +643,9 @@ public class OrderService {
             } else {
                 // 单人订单：按服务时长比例分配
                 for (OrderSession session : allSessions) {
-                    if (session.getActualHours() == null || session.getActualHours().compareTo(BigDecimal.ZERO) <= 0) continue;
+                    if (!"huhang".equals(order.getOrderType())) {
+                        if (session.getActualHours() == null || session.getActualHours().compareTo(BigDecimal.ZERO) <= 0) continue;
+                    }
 
                     // 该陪玩师服务时长占比
                     BigDecimal ratio = totalActualHours.compareTo(BigDecimal.ZERO) > 0 ?

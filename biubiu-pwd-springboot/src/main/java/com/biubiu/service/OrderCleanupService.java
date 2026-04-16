@@ -13,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
+
+import java.util.HashSet;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,25 +46,24 @@ public class OrderCleanupService {
      * 删除订单关联的截图文件
      */
     private void deleteOrderScreenshots(Order order) {
-        // 删除旧字段的截图（兼容旧数据）
-        deleteScreenshotFile(order.getStartScreenshotUrl());
-        deleteScreenshotFile(order.getEndScreenshotUrl());
+        Set<String> allUrls = new HashSet<>();
 
-        // 删除新字段的多张截图（逗号分隔的URL列表）
-        deleteMultipleScreenshots(order.getScreenshotUrls());
-    }
-
-    /**
-     * 删除多张截图文件（逗号分隔的URL列表）
-     */
-    private void deleteMultipleScreenshots(String screenshotUrls) {
-        if (screenshotUrls == null || screenshotUrls.isEmpty()) {
-            return;
+        if (order.getStartScreenshotUrl() != null && !order.getStartScreenshotUrl().isEmpty()) {
+            allUrls.add(order.getStartScreenshotUrl().trim());
         }
-        // screenshotUrls 格式: "/uploads/1.jpg,/uploads/2.jpg,/uploads/3.jpg"
-        String[] urls = screenshotUrls.split(",");
-        for (String url : urls) {
-            deleteScreenshotFile(url.trim());
+        if (order.getEndScreenshotUrl() != null && !order.getEndScreenshotUrl().isEmpty()) {
+            allUrls.add(order.getEndScreenshotUrl().trim());
+        }
+        if (order.getScreenshotUrls() != null && !order.getScreenshotUrls().isEmpty()) {
+            for (String url : order.getScreenshotUrls().split(",")) {
+                if (!url.trim().isEmpty()) {
+                    allUrls.add(url.trim());
+                }
+            }
+        }
+
+        for (String url : allUrls) {
+            deleteScreenshotFile(url);
         }
     }
 

@@ -53,7 +53,7 @@ export const resumeOrder = (id) => {
 }
 
 export const batchDeleteOrders = (ids) => {
-  return request.delete('/orders/batch', { data: ids })
+  return request.post('/orders/batch', ids)
 }
 
 export const replenishOrder = (data) => {

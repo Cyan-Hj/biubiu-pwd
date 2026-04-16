@@ -1842,13 +1842,13 @@ const handleDetail = async (row) => {
   detailDialogVisible.value = true
 }
 
-// 详情页截图URL列表（优先使用 screenshotUrls，兼容旧字段）
+// 详情页截图URL列表（统一使用 screenshotUrls 字段，避免重复）
 const detailScreenshotUrls = computed(() => {
   if (!currentOrder.value) return []
   if (currentOrder.value.screenshotUrls && currentOrder.value.screenshotUrls.length > 0) {
-    return currentOrder.value.screenshotUrls
+    return [...new Set(currentOrder.value.screenshotUrls)]
   }
-  return [currentOrder.value.startScreenshotUrl, currentOrder.value.endScreenshotUrl].filter(Boolean)
+  return []
 })
 
 // 图片预览
