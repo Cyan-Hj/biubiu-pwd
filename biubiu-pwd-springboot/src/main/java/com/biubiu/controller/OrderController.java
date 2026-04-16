@@ -361,27 +361,27 @@ public class OrderController {
             }
             
             // 计算实际收入和实际订单金额
-            BigDecimal pricePerHour = order.getPricePerHour();
+            // 使用订单总价作为基数（已包含等级单价 + 注意事项加价）
+            BigDecimal actualTotalAmount = order.getTotalAmount();
             BigDecimal createdHours = order.getServiceHours();
             BigDecimal actualHours = order.getActualHours() != null ? order.getActualHours() : createdHours;
             
-            BigDecimal actualTotalAmount;
+            // 如果实际时长大于预约时长，计算超时费用
             if (actualHours.compareTo(createdHours) > 0) {
+                BigDecimal actualPricePerHour = order.getTotalAmount().divide(createdHours, 2, java.math.RoundingMode.HALF_UP);
                 BigDecimal extraMinutes = actualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
                 int totalExtraMinutes = extraMinutes.intValue();
                 int fullHours = totalExtraMinutes / 60;
                 int remainingMinutes = totalExtraMinutes % 60;
                 
-                BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(pricePerHour);
+                BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(actualPricePerHour);
                 if (remainingMinutes > 15 && remainingMinutes <= 45) {
-                    extraFee = extraFee.add(pricePerHour.multiply(BigDecimal.valueOf(0.5)));
+                    extraFee = extraFee.add(actualPricePerHour.multiply(BigDecimal.valueOf(0.5)));
                 } else if (remainingMinutes > 45) {
-                    extraFee = extraFee.add(pricePerHour);
+                    extraFee = extraFee.add(actualPricePerHour);
                 }
                 
-                actualTotalAmount = createdHours.multiply(pricePerHour).add(extraFee);
-            } else {
-                actualTotalAmount = createdHours.multiply(pricePerHour);
+                actualTotalAmount = order.getTotalAmount().add(extraFee);
             }
             
             response.setActualTotalAmount(actualTotalAmount.setScale(2, java.math.RoundingMode.HALF_UP));

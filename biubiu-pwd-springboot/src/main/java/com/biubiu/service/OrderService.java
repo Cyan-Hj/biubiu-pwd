@@ -583,30 +583,28 @@ public class OrderService {
             }
 
             // 计算订单实际金额
-            BigDecimal actualTotalAmount;
-            if ("huhang".equals(order.getOrderType())) {
-                actualTotalAmount = order.getTotalAmount();
-            } else {
-                BigDecimal pricePerHour = order.getPricePerHour();
-                BigDecimal createdHours = order.getServiceHours();
+            // 使用订单总价作为基数（已包含等级单价 + 注意事项加价）
+            BigDecimal actualTotalAmount = order.getTotalAmount();
+            
+            // 如果实际时长大于预约时长，计算超时费用
+            BigDecimal createdHours = order.getServiceHours();
+            if (totalActualHours.compareTo(createdHours) > 0) {
+                // 计算每小时实际单价（总价 / 预约时长）
+                BigDecimal actualPricePerHour = order.getTotalAmount().divide(createdHours, 2, java.math.RoundingMode.HALF_UP);
                 
-                if (totalActualHours.compareTo(createdHours) > 0) {
-                    BigDecimal extraMinutes = totalActualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
-                    int totalExtraMinutes = extraMinutes.intValue();
-                    int fullHours = totalExtraMinutes / 60;
-                    int remainingMinutes = totalExtraMinutes % 60;
-                    
-                    BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(pricePerHour);
-                    if (remainingMinutes > 15 && remainingMinutes <= 45) {
-                        extraFee = extraFee.add(pricePerHour.multiply(BigDecimal.valueOf(0.5)));
-                    } else if (remainingMinutes > 45) {
-                        extraFee = extraFee.add(pricePerHour);
-                    }
-                    
-                    actualTotalAmount = createdHours.multiply(pricePerHour).add(extraFee);
-                } else {
-                    actualTotalAmount = createdHours.multiply(pricePerHour);
+                BigDecimal extraMinutes = totalActualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
+                int totalExtraMinutes = extraMinutes.intValue();
+                int fullHours = totalExtraMinutes / 60;
+                int remainingMinutes = totalExtraMinutes % 60;
+                
+                BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(actualPricePerHour);
+                if (remainingMinutes > 15 && remainingMinutes <= 45) {
+                    extraFee = extraFee.add(actualPricePerHour.multiply(BigDecimal.valueOf(0.5)));
+                } else if (remainingMinutes > 45) {
+                    extraFee = extraFee.add(actualPricePerHour);
                 }
+                
+                actualTotalAmount = order.getTotalAmount().add(extraFee);
             }
 
             // 获取平台抽成比例
