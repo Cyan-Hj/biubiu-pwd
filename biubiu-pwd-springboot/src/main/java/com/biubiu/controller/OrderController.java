@@ -361,36 +361,46 @@ public class OrderController {
             }
             
             // 计算实际收入和实际订单金额
-            // 使用订单总价作为基数（已包含等级单价 + 注意事项加价）
-            BigDecimal actualTotalAmount = order.getTotalAmount();
-            BigDecimal createdHours = order.getServiceHours();
-            BigDecimal actualHours = order.getActualHours() != null ? order.getActualHours() : createdHours;
-            
-            // 如果实际时长大于预约时长，计算超时费用
-            if (actualHours.compareTo(createdHours) > 0) {
-                BigDecimal actualPricePerHour = order.getTotalAmount().divide(createdHours, 2, java.math.RoundingMode.HALF_UP);
-                BigDecimal extraMinutes = actualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
-                int totalExtraMinutes = extraMinutes.intValue();
-                int fullHours = totalExtraMinutes / 60;
-                int remainingMinutes = totalExtraMinutes % 60;
-                
-                BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(actualPricePerHour);
-                if (remainingMinutes > 15 && remainingMinutes <= 45) {
-                    extraFee = extraFee.add(actualPricePerHour.multiply(BigDecimal.valueOf(0.5)));
-                } else if (remainingMinutes > 45) {
-                    extraFee = extraFee.add(actualPricePerHour);
+            // 优先使用管理员手动设置的实际总价
+            BigDecimal actualTotalAmount;
+            if (order.getActualTotalAmount() != null) {
+                actualTotalAmount = order.getActualTotalAmount();
+            } else if ("huhang".equals(order.getOrderType())) {
+                actualTotalAmount = order.getTotalAmount();
+            } else {
+                actualTotalAmount = order.getTotalAmount();
+                BigDecimal createdHours = order.getServiceHours();
+                BigDecimal actualHours = order.getActualHours() != null ? order.getActualHours() : createdHours;
+
+                if (actualHours.compareTo(createdHours) > 0) {
+                    BigDecimal actualPricePerHour = order.getTotalAmount().divide(createdHours, 2, java.math.RoundingMode.HALF_UP);
+                    BigDecimal extraMinutes = actualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
+                    int totalExtraMinutes = extraMinutes.intValue();
+                    int fullHours = totalExtraMinutes / 60;
+                    int remainingMinutes = totalExtraMinutes % 60;
+
+                    BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(actualPricePerHour);
+                    if (remainingMinutes > 15 && remainingMinutes <= 45) {
+                        extraFee = extraFee.add(actualPricePerHour.multiply(BigDecimal.valueOf(0.5)));
+                    } else if (remainingMinutes > 45) {
+                        extraFee = extraFee.add(actualPricePerHour);
+                    }
+
+                    actualTotalAmount = order.getTotalAmount().add(extraFee);
                 }
-                
-                actualTotalAmount = order.getTotalAmount().add(extraFee);
             }
             
             response.setActualTotalAmount(actualTotalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
             
-            BigDecimal actualPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
-            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
-                response.setActualIncomeAmount(actualPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+            if (order.getActualIncomeAmount() != null) {
+                response.setActualIncomeAmount(order.getActualIncomeAmount());
             } else {
-                response.setActualIncomeAmount(actualPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+                BigDecimal actualPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+                if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                    response.setActualIncomeAmount(actualPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+                } else {
+                    response.setActualIncomeAmount(actualPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+                }
             }
             
             // 设置incomeAmount（兼容旧逻辑）
@@ -408,29 +418,35 @@ public class OrderController {
             BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
                     .map(com.biubiu.entity.SystemConfig::getPlatformFeeRate)
                     .orElse(BigDecimal.valueOf(0.2));
-            
-            // 计算实际订单金额（基于实际时长）
-            BigDecimal pricePerHour = order.getPricePerHour();
-            BigDecimal createdHours = order.getServiceHours();
-            BigDecimal actualHours = order.getActualHours() != null ? order.getActualHours() : createdHours;
-            
+
+            // 优先使用管理员手动设置的实际总价
             BigDecimal actualTotalAmount;
-            if (actualHours.compareTo(createdHours) > 0) {
-                BigDecimal extraMinutes = actualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
-                int totalExtraMinutes = extraMinutes.intValue();
-                int fullHours = totalExtraMinutes / 60;
-                int remainingMinutes = totalExtraMinutes % 60;
-                
-                BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(pricePerHour);
-                if (remainingMinutes > 15 && remainingMinutes <= 45) {
-                    extraFee = extraFee.add(pricePerHour.multiply(BigDecimal.valueOf(0.5)));
-                } else if (remainingMinutes > 45) {
-                    extraFee = extraFee.add(pricePerHour);
-                }
-                
-                actualTotalAmount = createdHours.multiply(pricePerHour).add(extraFee);
+            if (order.getActualTotalAmount() != null) {
+                actualTotalAmount = order.getActualTotalAmount();
+            } else if ("huhang".equals(order.getOrderType())) {
+                actualTotalAmount = order.getTotalAmount();
             } else {
-                actualTotalAmount = createdHours.multiply(pricePerHour);
+                BigDecimal pricePerHour = order.getPricePerHour();
+                BigDecimal createdHours = order.getServiceHours();
+                BigDecimal actualHours = order.getActualHours() != null ? order.getActualHours() : createdHours;
+
+                if (actualHours.compareTo(createdHours) > 0) {
+                    BigDecimal extraMinutes = actualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
+                    int totalExtraMinutes = extraMinutes.intValue();
+                    int fullHours = totalExtraMinutes / 60;
+                    int remainingMinutes = totalExtraMinutes % 60;
+
+                    BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(pricePerHour);
+                    if (remainingMinutes > 15 && remainingMinutes <= 45) {
+                        extraFee = extraFee.add(pricePerHour.multiply(BigDecimal.valueOf(0.5)));
+                    } else if (remainingMinutes > 45) {
+                        extraFee = extraFee.add(pricePerHour);
+                    }
+
+                    actualTotalAmount = createdHours.multiply(pricePerHour).add(extraFee);
+                } else {
+                    actualTotalAmount = createdHours.multiply(pricePerHour);
+                }
             }
             
             response.setActualTotalAmount(actualTotalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
@@ -443,11 +459,15 @@ public class OrderController {
             response.setExpectedIncomeAmount(orderTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate)).setScale(2, java.math.RoundingMode.HALF_UP));
             
             // 计算实际收入
-            BigDecimal actualPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
-            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
-                response.setActualIncomeAmount(actualPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+            if (order.getActualIncomeAmount() != null) {
+                response.setActualIncomeAmount(order.getActualIncomeAmount());
             } else {
-                response.setActualIncomeAmount(actualPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+                BigDecimal actualPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+                if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                    response.setActualIncomeAmount(actualPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+                } else {
+                    response.setActualIncomeAmount(actualPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+                }
             }
             
             // 设置incomeAmount

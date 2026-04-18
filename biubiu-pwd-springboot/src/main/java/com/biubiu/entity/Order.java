@@ -99,6 +99,12 @@ public class Order {
     @Column(precision = 4, scale = 1)
     private BigDecimal actualHours;
 
+    @Column(precision = 10, scale = 2)
+    private BigDecimal actualTotalAmount;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal actualIncomeAmount;
+
     @Column(columnDefinition = "TEXT")
     private String cancelReason;
 
