@@ -617,56 +617,56 @@ public class OrderService {
             // 计算所有陪玩师的总可分配收入 = 实际金额 * (1 - 抽成比例)
             BigDecimal totalPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
 
-            // 双人订单：对半分
-            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
-                BigDecimal incomePerPerson = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
-                
+            List<FinancialRecord> existingRecords = financialRecordRepository.findByOrderIdAndType(order.getId(), FinancialRecord.Type.income);
+            if (existingRecords.isEmpty()) {
+                java.util.Map<Long, OrderSession> latestSessionPerPlayer = new java.util.LinkedHashMap<>();
                 for (OrderSession session : allSessions) {
-                    if (!"huhang".equals(order.getOrderType())) {
-                        if (session.getActualHours() == null || session.getActualHours().compareTo(BigDecimal.ZERO) <= 0) continue;
+                    Long playerId = session.getPlayer().getId();
+                    if (!latestSessionPerPlayer.containsKey(playerId)) {
+                        latestSessionPerPlayer.put(playerId, session);
                     }
-
-                    User player = session.getPlayer();
-                    player.setTotalIncome(player.getTotalIncome().add(incomePerPerson));
-                    player.setAvailableBalance(player.getAvailableBalance().add(incomePerPerson));
-                    userRepository.save(player);
-
-                    // 创建财务记录
-                    FinancialRecord record = new FinancialRecord();
-                    record.setOrder(order);
-                    record.setPlayer(player);
-                    record.setType(FinancialRecord.Type.income);
-                    record.setAmount(incomePerPerson);
-                    record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 双人订单对半分)");
-                    financialRecordRepository.save(record);
                 }
-            } else {
-                // 单人订单：按服务时长比例分配
-                for (OrderSession session : allSessions) {
-                    if (!"huhang".equals(order.getOrderType())) {
-                        if (session.getActualHours() == null || session.getActualHours().compareTo(BigDecimal.ZERO) <= 0) continue;
+
+                if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                    BigDecimal incomePerPerson = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+
+                    for (OrderSession session : latestSessionPerPlayer.values()) {
+                        User player = session.getPlayer();
+                        player.setTotalIncome(player.getTotalIncome().add(incomePerPerson));
+                        player.setAvailableBalance(player.getAvailableBalance().add(incomePerPerson));
+                        userRepository.save(player);
+
+                        FinancialRecord record = new FinancialRecord();
+                        record.setOrder(order);
+                        record.setPlayer(player);
+                        record.setType(FinancialRecord.Type.income);
+                        record.setAmount(incomePerPerson);
+                        record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 双人订单对半分)");
+                        financialRecordRepository.save(record);
                     }
+                } else {
+                    for (OrderSession session : latestSessionPerPlayer.values()) {
+                        BigDecimal ratio = BigDecimal.ONE;
+                        if (latestSessionPerPlayer.size() > 1 && totalActualHours.compareTo(BigDecimal.ZERO) > 0) {
+                            BigDecimal sessionHours = session.getActualHours() != null ? session.getActualHours() : BigDecimal.ZERO;
+                            ratio = sessionHours.divide(totalActualHours, 4, java.math.RoundingMode.HALF_UP);
+                        }
 
-                    // 该陪玩师服务时长占比
-                    BigDecimal ratio = totalActualHours.compareTo(BigDecimal.ZERO) > 0 ?
-                            session.getActualHours().divide(totalActualHours, 4, java.math.RoundingMode.HALF_UP) : BigDecimal.ONE;
+                        BigDecimal income = totalPlayerIncome.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
 
-                    // 该陪玩师实际所得
-                    BigDecimal income = totalPlayerIncome.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
+                        User player = session.getPlayer();
+                        player.setTotalIncome(player.getTotalIncome().add(income));
+                        player.setAvailableBalance(player.getAvailableBalance().add(income));
+                        userRepository.save(player);
 
-                    User player = session.getPlayer();
-                    player.setTotalIncome(player.getTotalIncome().add(income));
-                    player.setAvailableBalance(player.getAvailableBalance().add(income));
-                    userRepository.save(player);
-
-                    // 创建财务记录
-                    FinancialRecord record = new FinancialRecord();
-                    record.setOrder(order);
-                    record.setPlayer(player);
-                    record.setType(FinancialRecord.Type.income);
-                    record.setAmount(income);
-                    record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 占比: " + ratio.multiply(BigDecimal.valueOf(100)).setScale(2) + "%)");
-                    financialRecordRepository.save(record);
+                        FinancialRecord record = new FinancialRecord();
+                        record.setOrder(order);
+                        record.setPlayer(player);
+                        record.setType(FinancialRecord.Type.income);
+                        record.setAmount(income);
+                        record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 占比: " + ratio.multiply(BigDecimal.valueOf(100)).setScale(2) + "%)");
+                        financialRecordRepository.save(record);
+                    }
                 }
             }
 

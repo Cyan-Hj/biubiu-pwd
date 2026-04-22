@@ -69,7 +69,7 @@
               v-if="isAdmin || isCustomerService"
               type="primary"
               class="create-btn"
-              @click="createDialogVisible = true"
+              @click="handleOpenCreate"
             >
               <el-icon><Plus /></el-icon>
               创建订单
@@ -673,7 +673,7 @@
       </el-form>
       <template #footer>
         <el-button @click="assignDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitAssign">确定派送</el-button>
+        <el-button type="primary" @click="submitAssign" :loading="submittingAction === 'assign'">确定派送</el-button>
       </template>
     </el-dialog>
 
@@ -740,99 +740,77 @@
     </el-dialog>
 
     <!-- 编辑订单对话框 -->
-    <el-dialog v-model="editDialogVisible" title="编辑订单" width="600px" class="order-dialog">
-      <el-form :model="editForm" :rules="editRules" ref="editFormRef" label-width="100px" class="order-form">
-        <el-form-item label="订单号">
-          <span class="order-no-display">{{ currentOrder?.orderNo }}</span>
-        </el-form-item>
-        <el-form-item label="客户类型" prop="customer_type">
-          <el-radio-group v-model="editForm.customer_type" @change="handleEditCustomerTypeChange">
-            <el-radio-button label="SCATTER">散客</el-radio-button>
-            <el-radio-button label="REGULAR">固定客</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <template v-if="editForm.customer_type === 'REGULAR'">
-          <el-form-item label="老板名字" prop="boss_info">
-            <el-autocomplete
-              v-model="editForm.boss_info"
-              :fetch-suggestions="queryBossSuggestions"
-              placeholder=""
-              style="width: 100%"
-              @select="(item) => handleEditBossSelect(item)"
-              @clear="handleEditBossClear"
-              @input="handleEditBossInput"
-              clearable
-            >
-              <template #default="{ item }">
-                <div class="boss-suggestion-item">
-                  <span class="boss-suggestion-name">
-                    <span v-if="item.bossNo" class="boss-suggestion-no">{{ item.bossNo }}</span>
-                    {{ item.name }}
-                  </span>
-                  <span class="boss-suggestion-info">
-                    <el-tag size="small" type="warning">VIP{{ item.vipLevel }}</el-tag>
-                    <span class="boss-suggestion-balance">余额: ¥{{ item.balance }}</span>
-                  </span>
-                </div>
+    <el-dialog v-model="editDialogVisible" title="编辑订单" width="700px" class="order-dialog edit-order-dialog">
+      <div v-if="currentOrder" class="edit-order-content">
+        <div class="edit-section">
+          <div class="edit-section-title">基本信息</div>
+          <el-descriptions :column="2" border :colon="true">
+            <el-descriptions-item label="订单号">
+              <span class="order-no-display">{{ currentOrder.orderNo }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="订单类型">
+              <el-tag :type="currentOrder.playerCount === 'DOUBLE' ? 'warning' : 'primary'" effect="light" size="small">
+                {{ currentOrder.playerCount === 'DOUBLE' ? '双人订单' : '单人订单' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="老板名字">
+              <el-input v-model="editForm.boss_info" placeholder="请输入老板名字" size="small" />
+            </el-descriptions-item>
+            <el-descriptions-item label="陪玩师">
+              <span :class="{ 'no-player': !currentOrder.currentPlayerNickname }">
+                {{ currentOrder.currentPlayerNickname || '待分配' }}
+                <template v-if="currentOrder.currentPlayer2Nickname">
+                  / {{ currentOrder.currentPlayer2Nickname }}
+                </template>
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="服务内容" :span="2">
+              <el-input v-model="editForm.service_content" placeholder="请输入服务内容" size="small" />
+            </el-descriptions-item>
+            <el-descriptions-item label="服务时长">
+              <el-input-number v-model="editForm.service_hours" :min="0.5" :max="24" :step="0.5" size="small" style="width: 100%" :disabled="currentOrder.orderType === 'huhang'" @change="calculateEditTotalPrice" />
+            </el-descriptions-item>
+            <el-descriptions-item label="单价">
+              <el-input-number v-model="editForm.price_per_hour" :min="1" :max="1000" :precision="2" size="small" style="width: 100%" :disabled="currentOrder.orderType === 'huhang'" @change="calculateEditTotalPrice" />
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <div class="edit-section">
+          <div class="edit-section-title">金额信息</div>
+          <el-descriptions :column="2" border :colon="true">
+            <el-descriptions-item label="预计总价">
+              <el-input-number v-model="editForm.total_amount" :min="0" :max="100000" :precision="2" size="small" style="width: 100%" @change="calculateExpectedIncome" />
+            </el-descriptions-item>
+            <el-descriptions-item label="实际时长">
+              <template v-if="currentOrder.orderType === 'huhang'">
+                <span>1小时</span>
               </template>
-            </el-autocomplete>
-            <div v-if="!selectedEditBoss && editForm.boss_info && editForm.boss_info.trim()" class="boss-match-info">
-              <el-tag type="info" size="small">未匹配到已有老板，将自动创建新老板</el-tag>
-            </div>
-            </el-form-item>
-            <el-form-item v-if="selectedEditBoss" label="VIP折扣">
-            <div class="vip-info">
-              <el-tag type="warning">VIP{{ selectedEditBoss.vipLevel }}</el-tag>
-              <span class="discount-text">{{ getDiscountText(selectedEditBoss.vipLevel) }}</span>
-              <span class="discount-rate">({{ getDiscountRateText(selectedEditBoss.vipLevel) }})</span>
-              <span class="balance-text">预存余额: ¥{{ selectedEditBoss.balance }}</span>
-            </div>
-          </el-form-item>
-        </template>
-        <el-form-item v-if="editForm.customer_type === 'SCATTER'" label="老板名字" prop="boss_info">
-          <el-input v-model="editForm.boss_info" placeholder="请输入老板名字" />
-        </el-form-item>
-        <el-form-item label="服务内容" prop="service_content">
-          <el-input v-model="editForm.service_content" placeholder="请输入服务内容" />
-        </el-form-item>
-        <el-form-item label="服务时长" prop="service_hours">
-          <el-input-number v-model="editForm.service_hours" :min="0.5" :max="24" :step="0.5" style="width: 100%" @change="calculateEditTotalPrice" />
-        </el-form-item>
-        <el-form-item label="单价" prop="price_per_hour">
-          <el-input-number v-model="editForm.price_per_hour" :min="1" :max="1000" :precision="2" style="width: 100%" @change="calculateEditTotalPrice" />
-        </el-form-item>
-        <el-form-item label="原价">
-          <div class="original-price">¥{{ editCalculatedOriginalPrice.toFixed(2) }}</div>
-        </el-form-item>
-        <el-form-item v-if="editForm.customer_type === 'REGULAR' && selectedEditBoss && getVipDiscount(selectedEditBoss.vipLevel) < 1" label="折扣后">
-          <div class="discounted-price">¥{{ editCalculatedDiscountedPrice.toFixed(2) }}</div>
-          <div class="discount-info">{{ getDiscountText(selectedEditBoss.vipLevel) }} 优惠 ¥{{ (editCalculatedOriginalPrice - editCalculatedDiscountedPrice).toFixed(2) }}</div>
-        </el-form-item>
-        <el-form-item label="总价" prop="total_amount">
-          <el-input-number v-model="editForm.total_amount" :min="1" :max="10000" :precision="2" style="width: 100%" />
-        </el-form-item>
-        <el-form-item v-if="editForm.customer_type === 'REGULAR' && selectedEditBoss && selectedEditBoss.balance > 0" label="使用余额">
-          <el-switch v-model="editForm.use_balance" active-text="是" inactive-text="否" />
-          <div v-if="editForm.use_balance && editForm.total_amount > 0" class="balance-deduct-info">
-            将从预存余额中扣除 ¥{{ Math.min(selectedEditBoss.balance, editForm.total_amount).toFixed(2) }}
-          </div>
-        </el-form-item>
-        <el-form-item label="预约时间" prop="scheduled_time">
-          <el-date-picker
-            v-model="editForm.scheduled_time"
-            type="datetime"
-            placeholder="选择预约时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="editForm.remark" type="textarea" :rows="2" placeholder="可选" />
-        </el-form-item>
-      </el-form>
+              <div v-else class="edit-duration-group">
+                <el-input-number v-model="editForm.actual_hours" :min="0" :max="23" :step="1" size="small" style="width: 90px" @change="calculateActualAmounts" />
+                <span class="edit-duration-unit">时</span>
+                <el-input-number v-model="editForm.actual_minutes" :min="0" :max="59" :step="1" size="small" style="width: 90px" @change="calculateActualAmounts" />
+                <span class="edit-duration-unit">分</span>
+              </div>
+            </el-descriptions-item>
+            <el-descriptions-item label="预计收入">
+              <el-input-number v-model="editForm.expected_income_amount" :min="0" :max="100000" :precision="2" size="small" style="width: 100%" />
+              <div class="edit-field-hint">{{ currentOrder.playerCount === 'DOUBLE' ? '单人预计收入' : '陪玩师预计收入' }}</div>
+            </el-descriptions-item>
+            <el-descriptions-item label="实际总价">
+              <el-input-number v-model="editForm.actual_total_amount" :min="0" :max="100000" :precision="2" size="small" style="width: 100%" />
+              <div class="edit-field-hint">不填则系统自动计算</div>
+            </el-descriptions-item>
+            <el-descriptions-item label="实际收入">
+              <el-input-number v-model="editForm.actual_income_amount" :min="0" :max="100000" :precision="2" size="small" style="width: 100%" />
+              <div class="edit-field-hint">{{ currentOrder.playerCount === 'DOUBLE' ? '单人实际收入，不填则自动计算' : '陪玩师实际收入，不填则自动计算' }}</div>
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+      </div>
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitEdit">保存修改</el-button>
+        <el-button type="primary" @click="submitEdit" :loading="submittingAction === 'edit'">保存修改</el-button>
       </template>
     </el-dialog>
 
@@ -1087,7 +1065,7 @@ import { useUserStore } from '@/stores/user'
 import { getOrders, getOrderById, getMyInServiceOrders, createOrder, updateOrder, assignOrder, acceptOrder, completeOrder, cancelOrder, pauseOrder, resumeOrder, batchDeleteOrders, replenishOrder, getDeletedBackups, getDeletedBackup } from '@/api/orders'
 import { publishToHall, withdrawFromHall } from '@/api/grabHall'
 import { getPlayers } from '@/api/users'
-import { getLevelPrices, getSystemOptions } from '@/api/system'
+import { getLevelPrices, getSystemOptions, getSystemConfig } from '@/api/system'
 import { getBosses, getVipLevels, createBoss } from '@/api/boss'
 import dayjs from 'dayjs'
 import { Document, Plus, CircleCheck, CircleClose, Timer, Loading, Check, Position, RefreshRight, Calendar, View, User, Delete, Warning, Picture, InfoFilled, Upload, Clock, Edit, Search, Close, VideoPause, Tickets, RefreshLeft } from '@element-plus/icons-vue'
@@ -1113,6 +1091,7 @@ const precautions = ref([])
 const serviceItems = ref([])
 const bosses = ref([])
 const vipLevels = ref([])
+const platformFeeRate = ref(0.2)
 
 // 启用的老板列表
 const enabledBosses = computed(() => {
@@ -1185,6 +1164,7 @@ const orderStats = ref({
 })
 
 const createDialogVisible = ref(false)
+const submittingAction = ref('')
 const assignDialogVisible = ref(false)
 const completeDialogVisible = ref(false)
 const cancelDialogVisible = ref(false)
@@ -1343,45 +1323,20 @@ const pauseRules = {
 }
 
 const editDialogVisible = ref(false)
-const editFormRef = ref()
 const editForm = reactive({
   boss_info: '',
   service_content: '',
   service_hours: 1,
   price_per_hour: 50,
   total_amount: 50,
-  scheduled_time: '',
-  remark: '',
-  customer_type: 'SCATTER',
-  boss_id: null,
-  use_balance: false
+  expected_income_amount: null,
+  actual_hours: null,
+  actual_minutes: null,
+  actual_total_amount: null,
+  actual_income_amount: null
 })
 
-const editRules = {
-  boss_info: [{ required: true, message: '请输入老板名字', trigger: 'change' }],
-  service_content: [{ required: true, message: '请输入服务内容', trigger: 'blur' }],
-  service_hours: [{ required: true, message: '请输入服务时长', trigger: 'blur' }],
-  price_per_hour: [{ required: true, message: '请输入单价', trigger: 'blur' }],
-  total_amount: [{ required: true, message: '请输入总价', trigger: 'blur' }]
-}
-
-const selectedEditBoss = computed(() => {
-  if (!editForm.boss_id) return null
-  return bosses.value.find(boss => boss.id === editForm.boss_id)
-})
-
-const editCalculatedOriginalPrice = computed(() => {
-  return editForm.service_hours * editForm.price_per_hour
-})
-
-const editCalculatedDiscountedPrice = computed(() => {
-  const original = editCalculatedOriginalPrice.value
-  if (editForm.customer_type !== 'REGULAR' || !selectedEditBoss.value) {
-    return original
-  }
-  const discount = getVipDiscount(selectedEditBoss.value.vipLevel)
-  return original * discount
-})
+const editRules = {}
 
 const getStatusType = (status) => {
   const types = {
@@ -1866,13 +1821,14 @@ const submitAssign = async () => {
     return
   }
   
-  // 双人订单需要选择第二个陪玩师
   const isDoubleOrder = currentOrder.value?.playerCount === 'DOUBLE' || currentOrder.value?.playerCount === 'double'
   if (isDoubleOrder && !assignForm.player_id2) {
     ElMessage.warning('双人订单需要选择两个陪玩师')
     return
   }
   
+  if (submittingAction.value) return
+  submittingAction.value = 'assign'
   try {
     const assignData = { 
       playerId: assignForm.player_id,
@@ -1884,12 +1840,15 @@ const submitAssign = async () => {
     loadOrders()
   } catch (error) {
     ElMessage.error('派送失败')
+  } finally {
+    submittingAction.value = ''
   }
 }
 
 const handleAccept = async (row) => {
+  if (submittingAction.value) return
+  submittingAction.value = 'accept'
   try {
-    // 先获取订单最新状态
     const orderRes = await getOrderById(row.id)
     console.log('订单详情:', orderRes.data)
     console.log('当前用户ID:', userId.value)
@@ -1905,7 +1864,6 @@ const handleAccept = async (row) => {
     ElMessage.error(error.message || '接单失败')
     console.error('接单失败:', error)
     
-    // 如果是因为有服务中订单，显示详细信息
     if (error.message && error.message.includes('服务中的订单')) {
       try {
         const inServiceRes = await getMyInServiceOrders()
@@ -1924,6 +1882,8 @@ const handleAccept = async (row) => {
         console.error('获取服务中订单失败:', e)
       }
     }
+  } finally {
+    submittingAction.value = ''
   }
 }
 
@@ -2073,11 +2033,13 @@ const submitComplete = async () => {
   const valid = await completeFormRef.value?.validate().catch(() => false)
   if (!valid) return
 
-  // 检查是否至少上传了一张截图
   if (completeForm.screenshots.length === 0) {
     ElMessage.error('请上传至少一张结单截图')
     return
   }
+
+  if (submittingAction.value) return
+  submittingAction.value = 'complete'
 
   completing.value = true
   try {
@@ -2126,6 +2088,7 @@ const submitComplete = async () => {
     // 错误已在request.js中处理
   } finally {
     completing.value = false
+    submittingAction.value = ''
   }
 }
 
@@ -2316,110 +2279,126 @@ const handleResume = async (row) => {
   }
 }
 
-const handleEdit = (row) => {
-  currentOrder.value = row
-  editForm.boss_info = row.bossInfo
-  editForm.service_content = row.serviceContent
-  editForm.service_hours = row.serviceHours
-  editForm.price_per_hour = row.pricePerHour
-  editForm.total_amount = row.totalAmount
-  editForm.scheduled_time = row.scheduledTime ? dayjs(row.scheduledTime).format('YYYY-MM-DD HH:mm:ss') : ''
-  editForm.remark = row.remark || ''
-  editForm.customer_type = 'SCATTER'
-  editForm.boss_id = null
-  editForm.use_balance = false
+const handleEdit = async (row) => {
+  try {
+    const res = await getOrderById(row.id)
+    currentOrder.value = res.data || row
+  } catch (error) {
+    currentOrder.value = row
+  }
+  const order = currentOrder.value
+  const isHuhang = order.orderType === 'huhang'
+  editForm.boss_info = order.bossInfo || ''
+  editForm.service_content = order.serviceContent || ''
+  editForm.service_hours = isHuhang ? 1 : (order.serviceHours || 1)
+  editForm.price_per_hour = isHuhang ? (order.totalAmount || 50) : (order.pricePerHour || 50)
+  editForm.total_amount = order.totalAmount || 0
+  if (isHuhang) {
+    editForm.actual_hours = 1
+    editForm.actual_minutes = 0
+  } else if (order.actualHours) {
+    editForm.actual_hours = Math.floor(order.actualHours)
+    editForm.actual_minutes = Math.round((order.actualHours - Math.floor(order.actualHours)) * 60)
+  } else {
+    editForm.actual_hours = null
+    editForm.actual_minutes = null
+  }
+  editForm.actual_total_amount = order.actualTotalAmount || null
+  editForm.actual_income_amount = order.actualIncomeAmount || null
+  editForm.expected_income_amount = order.expectedIncomeAmount || null
+  if (!platformFeeRate.value || platformFeeRate.value === 0.2) {
+    getSystemConfig().then(res => {
+      if (res.data?.platformFeeRate != null) {
+        platformFeeRate.value = Number(res.data.platformFeeRate)
+      }
+    }).catch(() => {})
+  }
   editDialogVisible.value = true
 }
 
-const handleEditCustomerTypeChange = () => {
-  editForm.boss_id = null
-  editForm.boss_info = ''
-  editForm.use_balance = false
-  calculateEditTotalPrice()
-}
-
-const handleEditBossSelect = (item) => {
-  editForm.boss_id = item.id
-  editForm.boss_info = item.name
-  if (item.balance > 0) {
-    editForm.use_balance = true
-  }
-  const discountedPrice = editCalculatedDiscountedPrice.value
-  editForm.total_amount = Number(discountedPrice.toFixed(2))
-}
-
-const handleEditBossClear = () => {
-  editForm.boss_id = null
-  editForm.use_balance = false
-}
-
-const handleEditBossInput = (val) => {
-  if (editForm.boss_id) {
-    const boss = bosses.value.find(b => b.id === editForm.boss_id)
-    if (!boss || boss.name !== val) {
-      editForm.boss_id = null
-      editForm.use_balance = false
-    }
-  }
-  if (!editForm.boss_id && val && val.trim()) {
-    const exactMatch = enabledBosses.value.find(b => b.name === val.trim())
-    if (exactMatch) {
-      editForm.boss_id = exactMatch.id
-      if (exactMatch.balance > 0) {
-        editForm.use_balance = true
-      }
-    }
-  }
-}
-
 const calculateEditTotalPrice = () => {
-  const original = editForm.service_hours * editForm.price_per_hour
-  if (editForm.customer_type === 'REGULAR' && selectedEditBoss.value) {
-    const discount = getVipDiscount(selectedEditBoss.value.vipLevel)
-    editForm.total_amount = Number((original * discount).toFixed(2))
-  } else {
-    editForm.total_amount = Number(original.toFixed(2))
+  editForm.total_amount = Number((editForm.service_hours * editForm.price_per_hour).toFixed(2))
+  calculateExpectedIncome()
+}
+
+const calculateExpectedIncome = () => {
+  const total = editForm.total_amount || 0
+  const expected = Number((total * (1 - platformFeeRate.value)).toFixed(2))
+  editForm.expected_income_amount = currentOrder.value?.playerCount === 'DOUBLE'
+    ? Number((expected / 2).toFixed(2))
+    : expected
+}
+
+const calculateActualAmounts = () => {
+  const actualHoursTotal = (editForm.actual_hours || 0) + (editForm.actual_minutes || 0) / 60
+  const serviceHours = editForm.service_hours || 0
+  const pricePerHour = editForm.price_per_hour || 0
+  const totalAmount = editForm.total_amount || 0
+
+  if (actualHoursTotal <= 0) {
+    editForm.actual_total_amount = null
+    editForm.actual_income_amount = null
+    return
   }
+
+  let actualTotalAmount = totalAmount
+
+  if (currentOrder.value?.orderType !== 'huhang' && actualHoursTotal > serviceHours) {
+    const extraMinutes = (actualHoursTotal - serviceHours) * 60
+    const totalExtraMinutes = Math.round(extraMinutes)
+    const fullHours = Math.floor(totalExtraMinutes / 60)
+    const remainingMinutes = totalExtraMinutes % 60
+
+    let extraFee = fullHours * pricePerHour
+    if (remainingMinutes > 15 && remainingMinutes <= 45) {
+      extraFee += pricePerHour * 0.5
+    } else if (remainingMinutes > 45) {
+      extraFee += pricePerHour
+    }
+
+    actualTotalAmount = totalAmount + extraFee
+  }
+
+  editForm.actual_total_amount = Number(actualTotalAmount.toFixed(2))
+  const totalIncome = Number((actualTotalAmount * (1 - platformFeeRate.value)).toFixed(2))
+  editForm.actual_income_amount = currentOrder.value?.playerCount === 'DOUBLE'
+    ? Number((totalIncome / 2).toFixed(2))
+    : totalIncome
 }
 
 const submitEdit = async () => {
-  const valid = await editFormRef.value?.validate().catch(() => false)
-  if (!valid) return
-
+  if (submittingAction.value) return
+  submittingAction.value = 'edit'
   try {
-    let bossId = null
-    if (editForm.customer_type === 'REGULAR') {
-      if (editForm.boss_id) {
-        bossId = editForm.boss_id
-      } else if (editForm.boss_info && editForm.boss_info.trim()) {
-        const res = await createBoss({
-          name: editForm.boss_info.trim(),
-          contactType: 'WECHAT',
-          contactValue: '',
-          customerType: 'REGULAR',
-          vipLevel: 0
-        })
-        bossId = res.data?.id
-        await loadBosses()
-      }
-    }
+    const updateData = {}
 
-    const updateData = {
-      bossInfo: editForm.boss_info,
-      serviceContent: editForm.service_content,
-      serviceHours: editForm.service_hours,
-      pricePerHour: editForm.price_per_hour,
-      totalAmount: editForm.total_amount,
-      scheduledTime: editForm.scheduled_time ? dayjs(editForm.scheduled_time).format('YYYY-MM-DDTHH:mm:ss') : null,
-      remark: editForm.remark,
-      bossId: bossId,
-      useBalance: editForm.customer_type === 'REGULAR' ? editForm.use_balance : false
+    if (editForm.boss_info && editForm.boss_info.trim()) {
+      updateData.bossInfo = editForm.boss_info
     }
-
-    if (editForm.customer_type === 'REGULAR' && selectedEditBoss.value) {
-      updateData.originalAmount = editCalculatedOriginalPrice.value.toFixed(2)
-      const discount = getVipDiscount(selectedEditBoss.value.vipLevel)
-      updateData.discountRate = discount
+    if (editForm.service_content && editForm.service_content.trim()) {
+      updateData.serviceContent = editForm.service_content
+    }
+    if (editForm.service_hours != null) {
+      updateData.serviceHours = editForm.service_hours
+    }
+    if (editForm.price_per_hour != null) {
+      updateData.pricePerHour = editForm.price_per_hour
+    }
+    if (editForm.total_amount != null) {
+      updateData.totalAmount = editForm.total_amount
+    }
+    if (editForm.actual_hours != null || editForm.actual_minutes != null) {
+      const hours = (editForm.actual_hours || 0) + (editForm.actual_minutes || 0) / 60
+      updateData.actualHours = hours
+    }
+    if (editForm.actual_total_amount != null) {
+      updateData.actualTotalAmount = editForm.actual_total_amount
+    }
+    if (editForm.actual_income_amount != null) {
+      const isDouble = currentOrder.value?.playerCount === 'DOUBLE'
+      updateData.actualIncomeAmount = isDouble
+        ? Number((editForm.actual_income_amount * 2).toFixed(2))
+        : editForm.actual_income_amount
     }
 
     await updateOrder(currentOrder.value.id, updateData)
@@ -2428,6 +2407,8 @@ const submitEdit = async () => {
     loadOrders()
   } catch (error) {
     // 错误由 request.js 全局拦截器统一处理
+  } finally {
+    submittingAction.value = ''
   }
 }
 
@@ -2465,15 +2446,31 @@ watch(replenishDialogVisible, async (val) => {
   }
 })
 
-onMounted(() => {
-  loadOrders()
+const scheduleIdle = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
+
+const preloadConfigData = () => {
   loadLevelPrices()
   loadPrecautions()
   loadServiceItems()
   if (!isPlayer.value) {
     loadBosses()
     loadVipLevels()
+    getSystemConfig().then(res => {
+      if (res.data?.platformFeeRate != null) {
+        platformFeeRate.value = Number(res.data.platformFeeRate)
+      }
+    }).catch(() => {})
   }
+}
+
+const handleOpenCreate = () => {
+  if (!levelPrices.value.length) preloadConfigData()
+  createDialogVisible.value = true
+}
+
+onMounted(() => {
+  loadOrders()
+  scheduleIdle(preloadConfigData)
   timerInterval = setInterval(() => {
     now.value = dayjs()
   }, 1000)
@@ -3136,6 +3133,62 @@ onUnmounted(() => {
   font-weight: 600;
   color: #409eff;
   font-size: 14px;
+}
+
+.edit-order-dialog {
+  .edit-order-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .edit-section {
+    .edit-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #303133;
+      margin-bottom: 8px;
+      padding-left: 8px;
+      border-left: 3px solid #409eff;
+    }
+  }
+
+  .edit-duration-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .edit-duration-unit {
+      color: #606266;
+      font-size: 13px;
+    }
+  }
+
+  .edit-field-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #909399;
+  }
+
+  .no-player {
+    color: #c0c4cc;
+    font-style: italic;
+  }
+
+  :deep(.el-descriptions__body) {
+    .el-descriptions__table {
+      .el-descriptions__cell {
+        padding: 10px 14px;
+      }
+
+      .el-descriptions__label {
+        width: 100px;
+        font-weight: 600;
+        color: #606266;
+        background: #f5f7fa;
+      }
+    }
+  }
 }
 
 .cancel-reason {

@@ -393,7 +393,12 @@ public class OrderController {
             response.setActualTotalAmount(actualTotalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
             
             if (order.getActualIncomeAmount() != null) {
-                response.setActualIncomeAmount(order.getActualIncomeAmount());
+                BigDecimal storedIncome = order.getActualIncomeAmount();
+                if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                    response.setActualIncomeAmount(storedIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+                } else {
+                    response.setActualIncomeAmount(storedIncome);
+                }
             } else {
                 BigDecimal actualPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
                 if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
@@ -456,11 +461,21 @@ public class OrderController {
             if (orderTotalAmount == null) {
                 orderTotalAmount = order.getPricePerHour().multiply(order.getServiceHours());
             }
-            response.setExpectedIncomeAmount(orderTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate)).setScale(2, java.math.RoundingMode.HALF_UP));
+            BigDecimal expectedPlayerIncome = orderTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                response.setExpectedIncomeAmount(expectedPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+            } else {
+                response.setExpectedIncomeAmount(expectedPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+            }
             
             // 计算实际收入
             if (order.getActualIncomeAmount() != null) {
-                response.setActualIncomeAmount(order.getActualIncomeAmount());
+                BigDecimal storedIncome = order.getActualIncomeAmount();
+                if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                    response.setActualIncomeAmount(storedIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+                } else {
+                    response.setActualIncomeAmount(storedIncome);
+                }
             } else {
                 BigDecimal actualPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
                 if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {

@@ -50,6 +50,8 @@ public interface FinancialRecordRepository extends JpaRepository<FinancialRecord
     
     List<FinancialRecord> findByOrderId(Long orderId);
     
+    List<FinancialRecord> findByOrderIdAndType(Long orderId, FinancialRecord.Type type);
+    
     int deleteByOrderId(Long orderId);
     
     int deleteByCreatedAtBefore(LocalDateTime createdAt);
