@@ -73,4 +73,5 @@ public class OrderResponse {
     private Boolean inGrabHall;
     private String grabStatus;
     private String priorityLevel;
+    private Integer auditStatus;
 }

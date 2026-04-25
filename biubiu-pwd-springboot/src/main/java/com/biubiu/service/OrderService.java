@@ -609,67 +609,6 @@ public class OrderService {
                 }
             }
 
-            // 获取平台抽成比例
-            BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
-                    .map(SystemConfig::getPlatformFeeRate)
-                    .orElse(BigDecimal.valueOf(0.2));
-
-            // 计算所有陪玩师的总可分配收入 = 实际金额 * (1 - 抽成比例)
-            BigDecimal totalPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
-
-            List<FinancialRecord> existingRecords = financialRecordRepository.findByOrderIdAndType(order.getId(), FinancialRecord.Type.income);
-            if (existingRecords.isEmpty()) {
-                java.util.Map<Long, OrderSession> latestSessionPerPlayer = new java.util.LinkedHashMap<>();
-                for (OrderSession session : allSessions) {
-                    Long playerId = session.getPlayer().getId();
-                    if (!latestSessionPerPlayer.containsKey(playerId)) {
-                        latestSessionPerPlayer.put(playerId, session);
-                    }
-                }
-
-                if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
-                    BigDecimal incomePerPerson = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
-
-                    for (OrderSession session : latestSessionPerPlayer.values()) {
-                        User player = session.getPlayer();
-                        player.setTotalIncome(player.getTotalIncome().add(incomePerPerson));
-                        player.setAvailableBalance(player.getAvailableBalance().add(incomePerPerson));
-                        userRepository.save(player);
-
-                        FinancialRecord record = new FinancialRecord();
-                        record.setOrder(order);
-                        record.setPlayer(player);
-                        record.setType(FinancialRecord.Type.income);
-                        record.setAmount(incomePerPerson);
-                        record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 双人订单对半分)");
-                        financialRecordRepository.save(record);
-                    }
-                } else {
-                    for (OrderSession session : latestSessionPerPlayer.values()) {
-                        BigDecimal ratio = BigDecimal.ONE;
-                        if (latestSessionPerPlayer.size() > 1 && totalActualHours.compareTo(BigDecimal.ZERO) > 0) {
-                            BigDecimal sessionHours = session.getActualHours() != null ? session.getActualHours() : BigDecimal.ZERO;
-                            ratio = sessionHours.divide(totalActualHours, 4, java.math.RoundingMode.HALF_UP);
-                        }
-
-                        BigDecimal income = totalPlayerIncome.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
-
-                        User player = session.getPlayer();
-                        player.setTotalIncome(player.getTotalIncome().add(income));
-                        player.setAvailableBalance(player.getAvailableBalance().add(income));
-                        userRepository.save(player);
-
-                        FinancialRecord record = new FinancialRecord();
-                        record.setOrder(order);
-                        record.setPlayer(player);
-                        record.setType(FinancialRecord.Type.income);
-                        record.setAmount(income);
-                        record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 占比: " + ratio.multiply(BigDecimal.valueOf(100)).setScale(2) + "%)");
-                        financialRecordRepository.save(record);
-                    }
-                }
-            }
-
             // 更新老板的累计消费（按实际金额计算）
             if (order.getBoss() != null) {
                 Boss boss = order.getBoss();
@@ -678,7 +617,6 @@ public class OrderService {
             }
 
             order.setActualTotalAmount(actualTotalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
-            order.setActualIncomeAmount(totalPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
             orderRepository.save(order);
             logOperation(order, currentUser, "COMPLETE", oldStatus, Order.Status.COMPLETED, "完成订单（所有陪玩师已完成）");
         } else {
@@ -686,6 +624,95 @@ public class OrderService {
             orderRepository.save(order);
             logOperation(order, currentUser, "COMPLETE", oldStatus, Order.Status.IN_SERVICE, "完成服务，等待其他陪玩师完成");
         }
+    }
+
+    @Transactional
+    public void auditOrder(Long orderId, User auditor) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (order.getStatus() != Order.Status.COMPLETED) {
+            throw new RuntimeException("只有已完成的订单才能审核");
+        }
+        if (order.getAuditStatus() != null && order.getAuditStatus() == 1) {
+            throw new RuntimeException("该订单已审核");
+        }
+
+        BigDecimal actualTotalAmount = order.getActualTotalAmount() != null
+                ? order.getActualTotalAmount()
+                : order.getTotalAmount();
+
+        BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
+                .map(SystemConfig::getPlatformFeeRate)
+                .orElse(BigDecimal.valueOf(0.2));
+        BigDecimal totalPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+
+        List<OrderSession> allSessions = orderSessionRepository.findByOrderId(order.getId());
+        BigDecimal totalActualHours = allSessions.stream()
+                .map(s -> s.getActualHours() != null ? s.getActualHours() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (totalActualHours.compareTo(BigDecimal.ZERO) == 0 && order.getActualHours() != null) {
+            totalActualHours = order.getActualHours();
+        }
+
+        List<FinancialRecord> existingRecords = financialRecordRepository.findByOrderIdAndType(order.getId(), FinancialRecord.Type.income);
+        if (existingRecords.isEmpty()) {
+            java.util.Map<Long, OrderSession> latestSessionPerPlayer = new java.util.LinkedHashMap<>();
+            for (OrderSession session : allSessions) {
+                Long playerId = session.getPlayer().getId();
+                if (!latestSessionPerPlayer.containsKey(playerId)) {
+                    latestSessionPerPlayer.put(playerId, session);
+                }
+            }
+
+            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                BigDecimal incomePerPerson = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+                for (OrderSession session : latestSessionPerPlayer.values()) {
+                    User player = session.getPlayer();
+                    player.setTotalIncome(player.getTotalIncome().add(incomePerPerson));
+                    player.setAvailableBalance(player.getAvailableBalance().add(incomePerPerson));
+                    userRepository.save(player);
+
+                    FinancialRecord record = new FinancialRecord();
+                    record.setOrder(order);
+                    record.setPlayer(player);
+                    record.setType(FinancialRecord.Type.income);
+                    record.setAmount(incomePerPerson);
+                    record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 双人订单对半分)");
+                    financialRecordRepository.save(record);
+                }
+            } else {
+                for (OrderSession session : latestSessionPerPlayer.values()) {
+                    BigDecimal ratio = BigDecimal.ONE;
+                    if (latestSessionPerPlayer.size() > 1 && totalActualHours.compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal sessionHours = session.getActualHours() != null ? session.getActualHours() : BigDecimal.ZERO;
+                        ratio = sessionHours.divide(totalActualHours, 4, java.math.RoundingMode.HALF_UP);
+                    }
+
+                    BigDecimal income = totalPlayerIncome.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
+                    User player = session.getPlayer();
+                    player.setTotalIncome(player.getTotalIncome().add(income));
+                    player.setAvailableBalance(player.getAvailableBalance().add(income));
+                    userRepository.save(player);
+
+                    FinancialRecord record = new FinancialRecord();
+                    record.setOrder(order);
+                    record.setPlayer(player);
+                    record.setType(FinancialRecord.Type.income);
+                    record.setAmount(income);
+                    record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 占比: " + ratio.multiply(BigDecimal.valueOf(100)).setScale(2) + "%)");
+                    financialRecordRepository.save(record);
+                }
+            }
+        }
+
+        order.setActualIncomeAmount(totalPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+        order.setAuditStatus(1);
+        order.setAuditedBy(auditor);
+        order.setAuditedAt(LocalDateTime.now());
+        orderRepository.save(order);
+
+        logOperation(order, auditor, "AUDIT", Order.Status.COMPLETED, Order.Status.COMPLETED, "审核通过，发放收入");
     }
 
     @Transactional

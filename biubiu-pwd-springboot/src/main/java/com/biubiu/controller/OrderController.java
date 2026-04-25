@@ -261,6 +261,94 @@ public class OrderController {
         return ApiResponse.success(backup);
     }
 
+    @GetMapping("/pending-audit")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    public ApiResponse<List<AuditOrderResponse>> getPendingAuditOrders() {
+        List<Order> orders = orderRepository.findByStatusAndAuditStatus(Order.Status.COMPLETED, 0);
+        List<AuditOrderResponse> list = orders.stream()
+                .map(this::convertToAuditResponse)
+                .collect(Collectors.toList());
+        return ApiResponse.success(list);
+    }
+
+    @PostMapping("/{id}/audit-pass")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    public ApiResponse<Void> auditPassOrder(@PathVariable Long id) {
+        User currentUser = getCurrentUser();
+        orderService.auditOrder(id, currentUser);
+        return ApiResponse.success("审核通过", null);
+    }
+
+    @PostMapping("/batch-audit-pass")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    public ApiResponse<Integer> batchAuditPassOrders(@RequestBody List<Long> ids) {
+        User currentUser = getCurrentUser();
+        int count = 0;
+        for (Long id : ids) {
+            try {
+                orderService.auditOrder(id, currentUser);
+                count++;
+            } catch (Exception ignored) {
+            }
+        }
+        return ApiResponse.success("批量审核通过 " + count + " 条", count);
+    }
+
+    private AuditOrderResponse convertToAuditResponse(Order order) {
+        BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
+                .map(com.biubiu.entity.SystemConfig::getPlatformFeeRate)
+                .orElse(BigDecimal.valueOf(0.2));
+
+        BigDecimal orderTotalAmount = order.getTotalAmount();
+        if (orderTotalAmount == null) {
+            orderTotalAmount = order.getPricePerHour().multiply(order.getServiceHours());
+        }
+        BigDecimal expectedPlayerIncome = orderTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+        if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+            expectedPlayerIncome = expectedPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+        } else {
+            expectedPlayerIncome = expectedPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+
+        BigDecimal actualTotalAmount;
+        if (order.getActualTotalAmount() != null) {
+            actualTotalAmount = order.getActualTotalAmount();
+        } else {
+            actualTotalAmount = order.getTotalAmount();
+        }
+        actualTotalAmount = actualTotalAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+
+        BigDecimal actualPlayerIncome;
+        if (order.getActualIncomeAmount() != null) {
+            actualPlayerIncome = order.getActualIncomeAmount();
+            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                actualPlayerIncome = actualPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+            }
+        } else {
+            actualPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                actualPlayerIncome = actualPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+            } else {
+                actualPlayerIncome = actualPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP);
+            }
+        }
+
+        return AuditOrderResponse.builder()
+                .id(order.getId())
+                .orderNo(order.getOrderNo())
+                .playerId(order.getCurrentPlayer() != null ? order.getCurrentPlayer().getId() : null)
+                .playerNickname(order.getCurrentPlayer() != null ? order.getCurrentPlayer().getNickname() : null)
+                .totalAmount(order.getTotalAmount())
+                .serviceHours(order.getServiceHours())
+                .expectedIncomeAmount(expectedPlayerIncome)
+                .actualTotalAmount(actualTotalAmount)
+                .actualHours(order.getActualHours())
+                .actualIncomeAmount(actualPlayerIncome)
+                .completedAt(order.getCompletedAt())
+                .auditStatus(order.getAuditStatus())
+                .build();
+    }
+
     private OrderResponse convertToResponse(Order order) {
         OrderResponse response = OrderResponse.builder()
                 .id(order.getId())
@@ -299,6 +387,7 @@ public class OrderController {
                 .inGrabHall(order.getInGrabHall())
                 .grabStatus(order.getGrabStatus() != null ? order.getGrabStatus().name() : null)
                 .priorityLevel(order.getPriorityLevel())
+                .auditStatus(order.getAuditStatus())
                 .build();
         
         // 获取当前登录用户

@@ -67,3 +67,15 @@ export const getDeletedBackups = () => {
 export const getDeletedBackup = (orderNo) => {
   return request.get(`/orders/deleted-backups/${orderNo}`)
 }
+
+export const getPendingAuditOrders = () => {
+  return request.get('/orders/pending-audit')
+}
+
+export const auditPassOrder = (id) => {
+  return request.post(`/orders/${id}/audit-pass`)
+}
+
+export const batchAuditPassOrders = (ids) => {
+  return request.post('/orders/batch-audit-pass', ids)
+}

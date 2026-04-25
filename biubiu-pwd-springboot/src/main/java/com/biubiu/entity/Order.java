@@ -155,6 +155,15 @@ public class Order {
     @Column(name = "priority_level", length = 20)
     private String priorityLevel;
 
+    @Column(name = "audit_status")
+    private Integer auditStatus = 0;
+
+    @ManyToOne
+    @JoinColumn(name = "audited_by")
+    private User auditedBy;
+
+    private LocalDateTime auditedAt;
+
     public enum GrabStatus {
         OPEN,
         WAITING,

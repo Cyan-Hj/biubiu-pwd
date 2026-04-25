@@ -39,8 +39,11 @@
               <el-radio-button :label="6">
                 <el-icon><VideoPause /></el-icon>暂存
               </el-radio-button>
-              <el-radio-button :label="4">
-                <el-icon><CircleCheck /></el-icon>已完成
+              <el-radio-button label="pending_audit">
+                <el-icon><CircleCheck /></el-icon>待审核
+              </el-radio-button>
+              <el-radio-button label="audited">
+                <el-icon><CircleCheck /></el-icon>已审核
               </el-radio-button>
               <el-radio-button :label="5">
                 <el-icon><CircleClose /></el-icon>已取消
@@ -129,8 +132,15 @@
           <div class="stat-card completed">
             <div class="stat-icon"><el-icon><CircleCheck /></el-icon></div>
             <div class="stat-info">
-              <div class="stat-label">已完成</div>
-              <div class="stat-value">{{ orderStats.completed }}</div>
+              <div class="stat-label">待审核</div>
+              <div class="stat-value">{{ orderStats.pendingAudit }}</div>
+            </div>
+          </div>
+          <div class="stat-card audited">
+            <div class="stat-icon"><el-icon><CircleCheck /></el-icon></div>
+            <div class="stat-info">
+              <div class="stat-label">已审核</div>
+              <div class="stat-value">{{ orderStats.audited }}</div>
             </div>
           </div>
           <div class="stat-card cancelled">
@@ -153,9 +163,9 @@
                     {{ order.orderNo }}
                     <el-tag v-if="order.orderType === 'huhang'" size="small" type="warning" style="margin-left: 6px">护航</el-tag>
                   </span>
-                  <el-tag :type="getStatusType(order.status)" effect="dark" size="small">
+                  <el-tag :type="order.status === 4 ? getAuditStatusType(order.auditStatus) : getStatusType(order.status)" effect="dark" size="small">
                     <el-icon v-if="order.status === 3" class="is-loading"><Loading /></el-icon>
-                    {{ getStatusText(order.status) }}
+                    {{ order.status === 4 ? getAuditStatusText(order.auditStatus) : getStatusText(order.status) }}
                   </el-tag>
                 </div>
               </template>
@@ -262,6 +272,15 @@
             <el-icon><Delete /></el-icon>
             批量删除 {{ selectedOrders.length > 0 ? `(${selectedOrders.length})` : '' }}
           </el-button>
+          <el-button 
+            type="success" 
+            plain
+            :disabled="selectedCompletedOrders.length === 0"
+            @click="handleBatchAuditPass"
+          >
+            <el-icon><CircleCheck /></el-icon>
+            批量审核 {{ selectedCompletedOrders.length > 0 ? `(${selectedCompletedOrders.length})` : '' }}
+          </el-button>
           <span v-if="selectedOrders.length > 0" class="batch-tip">
             <el-icon><Warning /></el-icon>
             已选择 {{ selectedOrders.length }} 个订单
@@ -303,9 +322,9 @@
           </el-table-column>
           <el-table-column prop="status" label="状态" width="110">
             <template #default="{ row }">
-              <el-tag :type="getStatusType(row.status)" effect="light" size="small">
+              <el-tag :type="row.status === 4 ? getAuditStatusType(row.auditStatus) : getStatusType(row.status)" effect="light" size="small">
                 <el-icon v-if="row.status === 3" class="is-loading"><Loading /></el-icon>
-                {{ getStatusText(row.status) }}
+                {{ row.status === 4 ? getAuditStatusText(row.auditStatus) : getStatusText(row.status) }}
               </el-tag>
             </template>
           </el-table-column>
@@ -410,6 +429,14 @@
                   @click="handleCancel(row)"
                 >
                   <el-icon><CircleClose /></el-icon>取消
+                </el-button>
+                <el-button
+                  v-if="(isAdmin || isCustomerService) && row.status === 4 && row.auditStatus !== 1"
+                  type="success"
+                  size="small"
+                  @click="handleAuditPass(row)"
+                >
+                  <el-icon><CircleCheck /></el-icon>审核通过
                 </el-button>
               </div>
             </template>
@@ -865,8 +892,8 @@
       <el-descriptions :column="2" border v-if="currentOrder">
         <el-descriptions-item label="订单号">{{ currentOrder.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="订单状态">
-          <el-tag :type="getStatusType(currentOrder.status)" effect="light" size="small">
-            {{ getStatusText(currentOrder.status) }}
+          <el-tag :type="currentOrder.status === 4 ? getAuditStatusType(currentOrder.auditStatus) : getStatusType(currentOrder.status)" effect="light" size="small">
+            {{ currentOrder.status === 4 ? getAuditStatusText(currentOrder.auditStatus) : getStatusText(currentOrder.status) }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="订单类型">
@@ -1062,7 +1089,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { getOrders, getOrderById, getMyInServiceOrders, createOrder, updateOrder, assignOrder, acceptOrder, completeOrder, cancelOrder, pauseOrder, resumeOrder, batchDeleteOrders, replenishOrder, getDeletedBackups, getDeletedBackup } from '@/api/orders'
+import { getOrders, getOrderById, getMyInServiceOrders, createOrder, updateOrder, assignOrder, acceptOrder, completeOrder, cancelOrder, pauseOrder, resumeOrder, batchDeleteOrders, replenishOrder, getDeletedBackups, getDeletedBackup, auditPassOrder, batchAuditPassOrders } from '@/api/orders'
 import { publishToHall, withdrawFromHall } from '@/api/grabHall'
 import { getPlayers } from '@/api/users'
 import { getLevelPrices, getSystemOptions, getSystemConfig } from '@/api/system'
@@ -1159,7 +1186,8 @@ const orderStats = ref({
   waiting: 0,
   inService: 0,
   paused: 0,
-  completed: 0,
+  pendingAudit: 0,
+  audited: 0,
   cancelled: 0
 })
 
@@ -1173,6 +1201,10 @@ const currentOrder = ref(null)
 const createFormRef = ref()
 const cancelFormRef = ref()
 const selectedOrders = ref([])
+
+const selectedCompletedOrders = computed(() => {
+  return selectedOrders.value.filter(o => o.status === 4 && o.auditStatus !== 1)
+})
 
 const replenishDialogVisible = ref(false)
 const replenishLoading = ref(false)
@@ -1364,6 +1396,14 @@ const getStatusText = (status) => {
   return texts[status] || '未知'
 }
 
+const getAuditStatusType = (auditStatus) => {
+  return auditStatus === 1 ? 'success' : 'warning'
+}
+
+const getAuditStatusText = (auditStatus) => {
+  return auditStatus === 1 ? '已审核' : '待审核'
+}
+
 const formatDate = (date) => {
   return date ? dayjs(date).format('MM-DD HH:mm') : '-'
 }
@@ -1390,7 +1430,8 @@ const calculateStats = () => {
     waiting: orders.value.filter(o => o.status === 1 || o.status === 2).length,
     inService: orders.value.filter(o => o.status === 3).length,
     paused: orders.value.filter(o => o.status === 6).length,
-    completed: orders.value.filter(o => o.status === 4).length,
+    pendingAudit: orders.value.filter(o => o.status === 4 && o.auditStatus !== 1).length,
+    audited: orders.value.filter(o => o.status === 4 && o.auditStatus === 1).length,
     cancelled: orders.value.filter(o => o.status === 5).length
   }
 }
@@ -1398,10 +1439,14 @@ const calculateStats = () => {
 const loadOrders = async () => {
   loading.value = true
   try {
+    let apiStatus = statusFilter.value
+    if (apiStatus === 'pending_audit' || apiStatus === 'audited') {
+      apiStatus = 4
+    }
     const params = {
       page: page.value,
       pageSize: pageSize.value,
-      status: statusFilter.value !== '' ? statusFilter.value : undefined,
+      status: apiStatus !== '' ? apiStatus : undefined,
       sortBy: 'createdAt',
       sortOrder: 'desc'
     }
@@ -1415,7 +1460,13 @@ const loadOrders = async () => {
       params.keyword = searchKeyword.value.trim()
     }
     const res = await getOrders(params)
-    orders.value = Array.isArray(res.data) ? res.data : (res.data?.list || [])
+    let list = Array.isArray(res.data) ? res.data : (res.data?.list || [])
+    if (statusFilter.value === 'pending_audit') {
+      list = list.filter(o => o.auditStatus !== 1)
+    } else if (statusFilter.value === 'audited') {
+      list = list.filter(o => o.auditStatus === 1)
+    }
+    orders.value = list
     if (isPlayer.value) {
       const statusPriority = { 3: 0, 1: 1, 2: 2, 6: 3, 0: 4, 4: 5, 5: 6 }
       orders.value.sort((a, b) => {
@@ -2146,6 +2197,47 @@ const handleBatchDelete = async () => {
   }
 }
 
+const handleAuditPass = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定审核通过订单 ${row.orderNo} 吗？审核通过后将发放陪玩师收入。`,
+      '审核确认',
+      { confirmButtonText: '审核通过', cancelButtonText: '取消', type: 'info' }
+    )
+    await auditPassOrder(row.id)
+    ElMessage.success('审核通过')
+    loadOrders()
+  } catch (error) {
+    if (error !== 'cancel') {
+      // handled by interceptor
+    }
+  }
+}
+
+const handleBatchAuditPass = async () => {
+  const orders = selectedCompletedOrders.value
+  if (orders.length === 0) {
+    ElMessage.warning('请先选择待审核的订单')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定批量审核通过 ${orders.length} 个订单吗？审核通过后将发放陪玩师收入。`,
+      '批量审核确认',
+      { confirmButtonText: '全部通过', cancelButtonText: '取消', type: 'info' }
+    )
+    const ids = orders.map(o => o.id)
+    await batchAuditPassOrders(ids)
+    ElMessage.success('批量审核成功')
+    selectedOrders.value = []
+    loadOrders()
+  } catch (error) {
+    if (error !== 'cancel') {
+      // handled by interceptor
+    }
+  }
+}
+
 const submitCancel = async () => {
   const valid = await cancelFormRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -2649,8 +2741,13 @@ onUnmounted(() => {
   }
   
   &.completed .stat-icon {
-    background: #f4f4f5;
-    color: #909399;
+    background: #fdf6ec;
+    color: #e6a23c;
+  }
+  
+  &.audited .stat-icon {
+    background: #f0f9eb;
+    color: #67c23a;
   }
   
   &.cancelled .stat-icon {

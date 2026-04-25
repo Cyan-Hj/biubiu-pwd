@@ -121,4 +121,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                    @Param("orderType") String orderType,
                                    @Param("playerCount") Order.PlayerCount playerCount,
                                    Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.status = :status AND o.auditStatus = :auditStatus ORDER BY o.completedAt DESC")
+    List<Order> findByStatusAndAuditStatus(@Param("status") Order.Status status, @Param("auditStatus") Integer auditStatus);
 }
