@@ -148,6 +148,24 @@
             <div class="stat-value income">¥{{ profile.totalIncome || 0 }}</div>
           </div>
         </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item" @click="handleOpenDepositModeDialog" style="cursor: pointer;">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);">
+            <el-icon><Lock /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-label">押金</div>
+            <div class="stat-value">
+              <div v-if="profile.depositMode && profile.depositMode !== 'NONE'">
+                ¥{{ profile.deposit || 0 }}/{{ profile.depositLimit || 200 }}
+                <el-tag size="small" :type="profile.depositMode === 'SELF_PAY' ? 'success' : 'warning'" style="margin-left: 4px">
+                  {{ profile.depositMode === 'SELF_PAY' ? '自缴' : '单抵' }}
+                </el-tag>
+              </div>
+              <span v-else style="color: #909399">未设置 <el-icon style="font-size: 12px; margin-left: 2px;"><Edit /></el-icon></span>
+            </div>
+          </div>
+        </div>
       </div>
     </el-card>
 
@@ -161,6 +179,31 @@
       <template #footer>
         <el-button @click="showNicknameDialog = false">取消</el-button>
         <el-button type="primary" @click="handleUpdateNickname" :loading="nicknameLoading">确认</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 押金模式设置对话框 -->
+    <el-dialog v-model="showDepositModeDialog" title="设置押金模式" width="400px" :close-on-click-modal="false">
+      <div style="margin-bottom: 16px; color: #606266; font-size: 14px;">
+        请选择您的押金缴纳方式：
+      </div>
+      <el-radio-group v-model="depositModeForm.depositMode" style="display: flex; flex-direction: column; gap: 12px;">
+        <el-radio label="SELF_PAY" border style="margin-right: 0; padding: 12px 16px; height: auto;">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-weight: 500;">自缴押金</span>
+            <span style="font-size: 12px; color: #909399;">一次性缴纳押金，联系管理员缴纳</span>
+          </div>
+        </el-radio>
+        <el-radio label="ORDER_DEDUCT" border style="margin-right: 0; padding: 12px 16px; height: auto;">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-weight: 500;">单抵押金</span>
+            <span style="font-size: 12px; color: #909399;">从每笔订单收入中扣除10%作为押金</span>
+          </div>
+        </el-radio>
+      </el-radio-group>
+      <template #footer>
+        <el-button @click="showDepositModeDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleSetDepositMode" :loading="depositModeLoading">确认设置</el-button>
       </template>
     </el-dialog>
 
@@ -373,11 +416,11 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Ticket, Medal, CircleCheck, Money, Wallet, TopRight, Right, Warning, ChatDotRound, Plus, Key, CircleClose, Delete } from '@element-plus/icons-vue'
+import { Edit, Ticket, Medal, CircleCheck, Money, Wallet, TopRight, Right, Warning, ChatDotRound, Plus, Key, CircleClose, Delete, Lock } from '@element-plus/icons-vue'
 import { getProfile, updateNickname, changePassword } from '@/api/auth'
 import { applyLevelUpgrade, getMyLevelApplications } from '@/api/levelUpgrade'
 import { getLevelPrices } from '@/api/system'
-import { getCustomerServiceList, createCustomerService, updateCustomerService, resetCustomerServicePassword, deleteCustomerService } from '@/api/users'
+import { getCustomerServiceList, createCustomerService, updateCustomerService, resetCustomerServicePassword, deleteCustomerService, setMyDepositMode } from '@/api/users'
 import dayjs from 'dayjs'
 
 const userStore = useUserStore()
@@ -395,6 +438,13 @@ const passwordFormRef = ref(null)
 const upgradeFormRef = ref(null)
 const upgradeApplications = ref([])
 const upgradeLevels = ref([])
+
+// 押金设置相关
+const showDepositModeDialog = ref(false)
+const depositModeLoading = ref(false)
+const depositModeForm = reactive({
+  depositMode: ''
+})
 
 // 客服管理相关
 const csLoading = ref(false)
@@ -577,6 +627,29 @@ const loadUpgradeData = async () => {
     upgradeApplications.value = appsRes.data || []
   } catch (error) {
     console.error('加载升级数据失败', error)
+  }
+}
+
+const handleOpenDepositModeDialog = () => {
+  depositModeForm.depositMode = profile.value.depositMode || ''
+  showDepositModeDialog.value = true
+}
+
+const handleSetDepositMode = async () => {
+  if (!depositModeForm.depositMode) {
+    ElMessage.warning('请选择押金模式')
+    return
+  }
+  depositModeLoading.value = true
+  try {
+    await setMyDepositMode({ depositMode: depositModeForm.depositMode })
+    ElMessage.success('押金模式设置成功')
+    showDepositModeDialog.value = false
+    await loadProfile()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '设置失败')
+  } finally {
+    depositModeLoading.value = false
   }
 }
 
@@ -909,17 +982,17 @@ onMounted(() => {
 .player-stats {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0;
-  overflow-x: auto;
+  flex-wrap: wrap;
   padding: 4px 0;
 
   .stat-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 0 16px;
-    flex: 1;
+    padding: 12px 16px;
+    flex: 0 0 auto;
     min-width: 140px;
     justify-content: flex-start;
 

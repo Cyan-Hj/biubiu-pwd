@@ -1,8 +1,10 @@
 package com.biubiu.controller;
 
 import com.biubiu.dto.*;
+import com.biubiu.entity.FinancialRecord;
 import com.biubiu.entity.Order;
 import com.biubiu.entity.User;
+import com.biubiu.repository.FinancialRecordRepository;
 import com.biubiu.repository.LevelUpgradeApplicationRepository;
 import com.biubiu.repository.OrderRepository;
 import com.biubiu.repository.UserRepository;
@@ -29,6 +31,7 @@ public class UserController {
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final LevelUpgradeApplicationRepository levelUpgradeApplicationRepository;
+    private final FinancialRecordRepository financialRecordRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -48,6 +51,9 @@ public class UserController {
                 .status(user.getStatus())
                 .totalIncome(user.getTotalIncome())
                 .availableBalance(user.getAvailableBalance())
+                .deposit(user.getDeposit())
+                .depositLimit(user.getDepositLimit())
+                .depositMode(user.getDepositMode())
                 .createdAt(user.getCreatedAt())
                 .build();
 
@@ -92,6 +98,9 @@ public class UserController {
                     .status(user.getStatus())
                     .totalIncome(user.getTotalIncome())
                     .availableBalance(user.getAvailableBalance())
+                    .deposit(user.getDeposit())
+                    .depositLimit(user.getDepositLimit())
+                    .depositMode(user.getDepositMode())
                     .activeOrdersCount(activeOrders)
                     .build();
         }).collect(Collectors.toList());
@@ -224,6 +233,9 @@ public class UserController {
                 .status(user.getStatus())
                 .totalIncome(user.getTotalIncome())
                 .availableBalance(user.getAvailableBalance())
+                .deposit(user.getDeposit())
+                .depositLimit(user.getDepositLimit())
+                .depositMode(user.getDepositMode())
                 .createdAt(user.getCreatedAt())
                 .build();
         return ApiResponse.success(response);
@@ -351,5 +363,87 @@ public class UserController {
 
         userRepository.delete(cs);
         return ApiResponse.success("客服账号已删除", null);
+    }
+
+    @PutMapping("/{id}/deposit")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> updateDeposit(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+
+        if (body.containsKey("deposit")) {
+            java.math.BigDecimal newDeposit = new java.math.BigDecimal(body.get("deposit").toString());
+            java.math.BigDecimal oldDeposit = user.getDeposit() != null ? user.getDeposit() : java.math.BigDecimal.ZERO;
+            user.setDeposit(newDeposit);
+
+            if (newDeposit.compareTo(oldDeposit) != 0) {
+                FinancialRecord record = new FinancialRecord();
+                record.setPlayer(user);
+                record.setRecordType(FinancialRecord.Type.deposit);
+                record.setAmount(newDeposit.subtract(oldDeposit));
+                record.setDescription("管理员调整押金: " + oldDeposit + " → " + newDeposit);
+                financialRecordRepository.save(record);
+            }
+        }
+        if (body.containsKey("depositLimit")) {
+            user.setDepositLimit(new java.math.BigDecimal(body.get("depositLimit").toString()));
+        }
+        if (body.containsKey("depositMode")) {
+            user.setDepositMode(User.DepositMode.valueOf(body.get("depositMode").toString()));
+        }
+
+        userRepository.save(user);
+        return ApiResponse.success("押金信息更新成功", null);
+    }
+
+    @PutMapping("/me/deposit-mode")
+    @PreAuthorize("hasRole('PLAYER')")
+    public ApiResponse<Void> setMyDepositMode(@RequestBody java.util.Map<String, String> body) {
+        User currentUser = getCurrentUserEntity();
+        String modeStr = body.get("depositMode");
+        if (modeStr == null || modeStr.isEmpty()) {
+            return ApiResponse.error("押金模式不能为空");
+        }
+        try {
+            User.DepositMode newMode = User.DepositMode.valueOf(modeStr);
+            if (newMode == User.DepositMode.NONE) {
+                return ApiResponse.error("不能设置为未设置状态");
+            }
+            currentUser.setDepositMode(newMode);
+            userRepository.save(currentUser);
+            return ApiResponse.success("押金模式设置成功", null);
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.error("无效的押金模式");
+        }
+    }
+
+    @PostMapping("/{id}/deposit/pay")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    public ApiResponse<Void> payDeposit(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+
+        java.math.BigDecimal amount = new java.math.BigDecimal(body.get("amount").toString());
+        if (amount.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("缴纳金额必须大于0");
+        }
+
+        java.math.BigDecimal newDeposit = user.getDeposit().add(amount);
+        if (user.getDepositLimit() != null && newDeposit.compareTo(user.getDepositLimit()) > 0) {
+            throw new RuntimeException("押金不能超过上限 " + user.getDepositLimit());
+        }
+
+        user.setDeposit(newDeposit);
+        user.setDepositMode(User.DepositMode.SELF_PAY);
+        userRepository.save(user);
+
+        FinancialRecord record = new FinancialRecord();
+        record.setPlayer(user);
+        record.setRecordType(FinancialRecord.Type.deposit);
+        record.setAmount(amount);
+        record.setDescription("自缴押金 " + amount + "元");
+        financialRecordRepository.save(record);
+
+        return ApiResponse.success("押金缴纳成功", null);
     }
 }

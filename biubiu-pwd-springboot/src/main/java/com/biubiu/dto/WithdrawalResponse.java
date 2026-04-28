@@ -19,6 +19,7 @@ public class WithdrawalResponse {
     private String paymentMethod;
     private String accountInfo;
     private String realName;
+    private String bankName;
     private WithdrawalRequest.Status status;
     private String rejectReason;
     private LocalDateTime createdAt;

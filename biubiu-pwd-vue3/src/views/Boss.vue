@@ -145,48 +145,25 @@
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
-        <el-table-column label="操作" width="320" fixed="right">
+        <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
             <div class="action-group">
-              <el-button type="primary" size="small" @click="handleRecharge(row)">
-                <el-icon><Money /></el-icon>充值
-              </el-button>
-              <el-button type="success" size="small" @click="handleEditBalance(row)">
-                <el-icon><Edit /></el-icon>改余额
-              </el-button>
-              <el-button type="info" size="small" @click="handleRecords(row)">
-                <el-icon><List /></el-icon>记录
-              </el-button>
-              <el-button type="warning" size="small" @click="handleEdit(row)">
-                <el-icon><Edit /></el-icon>编辑
-              </el-button>
-              <el-button
-                v-if="row.enabled"
-                type="danger"
-                size="small"
-                @click="handleDisable(row)"
-              >
-                <el-icon><CircleClose /></el-icon>禁用
-              </el-button>
-              <el-button
-                v-else
-                type="success"
-                size="small"
-                @click="handleEnable(row)"
-              >
-                <el-icon><CircleCheck /></el-icon>启用
-              </el-button>
-              <el-button
-                type="danger"
-                size="small"
-                :loading="deleting"
-                :disabled="deleting"
-                @click="handleDelete(row)"
-              >
-                <el-icon v-if="!deleting"><Delete /></el-icon>
-                <span v-if="deleting">删除中</span>
-                <span v-else>删除</span>
-              </el-button>
+              <el-dropdown size="small" trigger="click" @command="(cmd) => handleBossAction(cmd, row)">
+                <el-button type="primary" size="small">
+                  <el-icon><Operation /></el-icon>操作<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="recharge"><el-icon><Money /></el-icon>充值</el-dropdown-item>
+                    <el-dropdown-item command="editBalance"><el-icon><Edit /></el-icon>改余额</el-dropdown-item>
+                    <el-dropdown-item command="records"><el-icon><List /></el-icon>记录</el-dropdown-item>
+                    <el-dropdown-item command="edit"><el-icon><Edit /></el-icon>编辑</el-dropdown-item>
+                    <el-dropdown-item v-if="row.enabled" command="disable"><el-icon><CircleClose /></el-icon>禁用</el-dropdown-item>
+                    <el-dropdown-item v-else command="enable"><el-icon><CircleCheck /></el-icon>启用</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided><el-icon><Delete /></el-icon>删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
           </template>
         </el-table-column>

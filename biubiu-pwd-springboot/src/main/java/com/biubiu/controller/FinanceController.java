@@ -325,6 +325,7 @@ public class FinanceController {
         withdrawal.setPaymentMethod(request.getPaymentMethod());
         withdrawal.setAccountInfo(request.getAccountInfo());
         withdrawal.setRealName(request.getRealName());
+        withdrawal.setBankName(request.getBankName());
         withdrawal.setStatus(WithdrawalRequest.Status.pending);
 
         withdrawalRequestRepository.save(withdrawal);
@@ -373,7 +374,7 @@ public class FinanceController {
 
             FinancialRecord record = new FinancialRecord();
             record.setPlayer(withdrawal.getPlayer());
-            record.setType(FinancialRecord.Type.withdrawal);
+            record.setRecordType(FinancialRecord.Type.withdrawal);
             record.setAmount(withdrawal.getAmount());
             record.setDescription("提现到" + (withdrawal.getPaymentMethod() != null ? withdrawal.getPaymentMethod() : "") + "（审核通过）");
             financialRecordRepository.save(record);
@@ -413,7 +414,7 @@ public class FinanceController {
         if (request.getStatus() == WithdrawalRequest.Status.approved) {
             FinancialRecord record = new FinancialRecord();
             record.setPlayer(withdrawal.getPlayer());
-            record.setType(FinancialRecord.Type.withdrawal);
+            record.setRecordType(FinancialRecord.Type.withdrawal);
             record.setAmount(withdrawal.getAmount());
             record.setDescription("提现到" + (withdrawal.getPaymentMethod() != null ? withdrawal.getPaymentMethod() : "") + "（审核通过）");
             financialRecordRepository.save(record);
@@ -427,7 +428,7 @@ public class FinanceController {
     private FinancialRecordResponse convertToRecordResponse(FinancialRecord record) {
         return FinancialRecordResponse.builder()
                 .id(record.getId())
-                .type(record.getType())
+                .recordType(record.getRecordType())
                 .amount(record.getAmount())
                 .orderNo(record.getOrder() != null ? record.getOrder().getOrderNo() : null)
                 .serviceContent(record.getOrder() != null ? record.getOrder().getServiceContent() : null)
@@ -455,6 +456,7 @@ public class FinanceController {
                 .paymentMethod(withdrawal.getPaymentMethod())
                 .accountInfo(withdrawal.getAccountInfo())
                 .realName(withdrawal.getRealName())
+                .bankName(withdrawal.getBankName())
                 .status(withdrawal.getStatus())
                 .rejectReason(withdrawal.getRejectReason())
                 .createdAt(withdrawal.getCreatedAt())

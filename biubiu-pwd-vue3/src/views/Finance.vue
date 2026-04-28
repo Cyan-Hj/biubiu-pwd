@@ -205,6 +205,9 @@
           <el-form-item label="真实姓名">
             <el-input v-model="withdrawForm.realName" placeholder="请输入真实姓名" />
           </el-form-item>
+          <el-form-item v-if="withdrawForm.paymentMethod === 'bank'" label="所在银行">
+            <el-input v-model="withdrawForm.bankName" placeholder="请输入所在银行，如：中国工商银行" />
+          </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleWithdraw" :disabled="!canWithdraw" class="withdraw-btn">
               <el-icon><Check /></el-icon>
@@ -240,16 +243,16 @@
             <div class="time-cell">{{ formatDate(row.createdAt) }}</div>
           </template>
         </el-table-column>
-        <el-table-column prop="type" label="类型" width="90">
+        <el-table-column prop="recordType" label="类型" width="90">
           <template #default="{ row }">
-            <el-tag v-if="row.type === 'income'" type="success" effect="light" size="small">收入</el-tag>
-            <el-tag v-else-if="row.type === 'withdrawal'" type="danger" effect="light" size="small">提现</el-tag>
+            <el-tag v-if="row.recordType === 'income'" type="success" effect="light" size="small">收入</el-tag>
+            <el-tag v-else-if="row.recordType === 'withdrawal'" type="danger" effect="light" size="small">提现</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="amount" label="金额" width="130">
           <template #default="{ row }">
-            <span class="amount-cell" :class="{ 'income': row.type === 'income', 'expense': row.type === 'withdrawal' }">
-              {{ row.type === 'income' ? '+' : row.type === 'withdrawal' ? '-' : '' }}¥{{ formatNumber(row.amount) }}
+            <span class="amount-cell" :class="{ 'income': row.recordType === 'income', 'expense': row.recordType === 'withdrawal' }">
+              {{ row.recordType === 'income' ? '+' : row.recordType === 'withdrawal' ? '-' : '' }}¥{{ formatNumber(row.amount) }}
             </span>
           </template>
         </el-table-column>
@@ -327,7 +330,8 @@ const withdrawForm = reactive({
   amount: 100,
   paymentMethod: 'alipay',
   accountInfo: '',
-  realName: ''
+  realName: '',
+  bankName: ''
 })
 
 const canWithdraw = computed(() => {
@@ -346,7 +350,7 @@ const averageOrderValue = computed(() => {
 
 const filteredRecords = computed(() => {
   if (!recordTypeFilter.value) return records.value
-  return records.value.filter(r => r.type === recordTypeFilter.value)
+  return records.value.filter(r => r.recordType === recordTypeFilter.value)
 })
 
 const formatNumber = (num) => {
@@ -547,6 +551,10 @@ const handleWithdraw = async () => {
     ElMessage.warning('请填写完整信息')
     return
   }
+  if (withdrawForm.paymentMethod === 'bank' && !withdrawForm.bankName) {
+    ElMessage.warning('请填写所在银行')
+    return
+  }
   if (withdrawForm.amount > incomeData.value.availableBalance) {
     ElMessage.warning('提现金额不能超过可提现余额')
     return
@@ -559,6 +567,7 @@ const handleWithdraw = async () => {
     withdrawForm.amount = 100
     withdrawForm.accountInfo = ''
     withdrawForm.realName = ''
+    withdrawForm.bankName = ''
   } catch (error) {
     ElMessage.error('提现申请失败')
   }
@@ -948,6 +957,182 @@ watch(() => adminStats.value, () => {
     color: #909399;
     font-size: 14px;
     margin-top: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .finance-page {
+    padding: 10px;
+  }
+
+  .stats-row,
+  .player-stats-row {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .stat-card {
+    padding: 12px;
+    gap: 10px;
+
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      font-size: 20px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+    }
+  }
+
+  .charts-row {
+    margin-bottom: 12px;
+  }
+
+  .chart-card {
+    margin-bottom: 12px;
+
+    :deep(.el-card__header) {
+      padding: 12px 14px;
+    }
+  }
+
+  .chart-container {
+    height: 240px;
+  }
+
+  .ranking-card {
+    margin-bottom: 12px;
+
+    :deep(.el-card__header) {
+      padding: 12px 14px;
+    }
+  }
+
+  .rank-item {
+    padding: 10px 12px;
+    gap: 10px;
+
+    .rank-number {
+      width: 28px;
+      height: 28px;
+      font-size: 12px;
+    }
+
+    .rank-name {
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .rank-income {
+      font-size: 14px;
+    }
+  }
+
+  .withdraw-card {
+    margin-bottom: 12px;
+
+    :deep(.el-card__header) {
+      padding: 12px 14px;
+    }
+  }
+
+  .withdraw-form {
+    :deep(.el-form-item__label) {
+      float: none;
+      display: block;
+      text-align: left;
+      padding-bottom: 4px;
+      width: auto !important;
+    }
+
+    :deep(.el-form-item__content) {
+      margin-left: 0 !important;
+    }
+  }
+
+  .records-card {
+    :deep(.el-card__header) {
+      padding: 12px 14px;
+    }
+  }
+
+  .records-table {
+    min-width: 700px;
+  }
+
+  .pagination {
+    margin-top: 12px;
+
+    :deep(.el-pagination) {
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+
+      .el-pagination__sizes {
+        display: none;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .finance-page {
+    padding: 8px;
+  }
+
+  .stat-card {
+    padding: 10px;
+    gap: 8px;
+
+    .stat-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 18px;
+    }
+
+    .stat-value {
+      font-size: 18px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+    }
+  }
+
+  .chart-container {
+    height: 200px;
+  }
+
+  .rank-item {
+    padding: 8px 10px;
+    gap: 8px;
+
+    .rank-number {
+      width: 24px;
+      height: 24px;
+      font-size: 11px;
+    }
+
+    .rank-name {
+      font-size: 12px;
+    }
+
+    .rank-income {
+      font-size: 13px;
+    }
+  }
+
+  .withdraw-btn {
+    width: 100%;
+    padding: 10px;
   }
 }
 </style>

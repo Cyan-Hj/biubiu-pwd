@@ -34,6 +34,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="accountInfo" label="收款账户" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="bankName" label="所在银行" width="120" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.bankName || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="realName" label="真实姓名" width="100" />
         <el-table-column prop="createdAt" label="申请时间" width="160">
           <template #default="{ row }">
@@ -192,5 +197,64 @@ onMounted(() => {
 .reviewed-info {
   font-size: 12px;
   color: #909399;
+}
+
+@media (max-width: 768px) {
+  .withdrawals-page {
+    padding: 10px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+
+    .el-radio-group {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .el-radio-button__inner {
+      padding: 7px 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .el-button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .el-table {
+    min-width: 700px;
+  }
+}
+
+@media (max-width: 480px) {
+  .withdrawals-page {
+    padding: 8px;
+  }
+
+  .card-header {
+    gap: 8px;
+  }
+
+  .header-actions {
+    gap: 6px;
+
+    .el-radio-button__inner {
+      padding: 5px 8px;
+      font-size: 11px;
+    }
+  }
 }
 </style>

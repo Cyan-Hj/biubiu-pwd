@@ -36,6 +36,7 @@ public class OrderResponse {
     private BigDecimal expectedIncomeAmount; // 预计收入（基于订单总价）
     private BigDecimal actualIncomeAmount; // 实际收入（基于实际时长计算）
     private BigDecimal actualTotalAmount; // 实际订单金额（基于实际时长计算）
+    private BigDecimal depositDeductAmount; // 单抵金额（本次订单扣押金金额）
     
     // 取消相关信息
     private String cancelReason;

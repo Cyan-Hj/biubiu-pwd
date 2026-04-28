@@ -645,7 +645,9 @@ public class OrderService {
         BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
                 .map(SystemConfig::getPlatformFeeRate)
                 .orElse(BigDecimal.valueOf(0.2));
-        BigDecimal totalPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+        BigDecimal totalPlayerIncome = order.getActualIncomeAmount() != null
+                ? order.getActualIncomeAmount()
+                : actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
 
         List<OrderSession> allSessions = orderSessionRepository.findByOrderId(order.getId());
         BigDecimal totalActualHours = allSessions.stream()
@@ -655,7 +657,7 @@ public class OrderService {
             totalActualHours = order.getActualHours();
         }
 
-        List<FinancialRecord> existingRecords = financialRecordRepository.findByOrderIdAndType(order.getId(), FinancialRecord.Type.income);
+        List<FinancialRecord> existingRecords = financialRecordRepository.findByOrderIdAndRecordType(order.getId(), FinancialRecord.Type.income);
         if (existingRecords.isEmpty()) {
             java.util.Map<Long, OrderSession> latestSessionPerPlayer = new java.util.LinkedHashMap<>();
             for (OrderSession session : allSessions) {
@@ -669,17 +671,43 @@ public class OrderService {
                 BigDecimal incomePerPerson = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
                 for (OrderSession session : latestSessionPerPlayer.values()) {
                     User player = session.getPlayer();
-                    player.setTotalIncome(player.getTotalIncome().add(incomePerPerson));
-                    player.setAvailableBalance(player.getAvailableBalance().add(incomePerPerson));
+                    BigDecimal actualReceive = incomePerPerson;
+                    BigDecimal depositDeduct = BigDecimal.ZERO;
+
+                    if (player.getDepositMode() == User.DepositMode.ORDER_DEDUCT
+                            && (player.getDeposit() == null || player.getDeposit().compareTo(player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200)) < 0)) {
+                        BigDecimal shouldDeduct = incomePerPerson.multiply(BigDecimal.valueOf(0.1));
+                        BigDecimal currentDeposit = player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO;
+                        BigDecimal depositLimit = player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200);
+                        BigDecimal remainingNeeded = depositLimit.subtract(currentDeposit);
+                        depositDeduct = shouldDeduct.min(remainingNeeded).max(BigDecimal.ZERO);
+                        actualReceive = incomePerPerson.subtract(depositDeduct);
+                    }
+
+                    player.setTotalIncome(player.getTotalIncome().add(actualReceive));
+                    player.setAvailableBalance(player.getAvailableBalance().add(actualReceive));
+                    if (depositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                        player.setDeposit((player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO).add(depositDeduct));
+                    }
                     userRepository.save(player);
 
                     FinancialRecord record = new FinancialRecord();
                     record.setOrder(order);
                     record.setPlayer(player);
-                    record.setType(FinancialRecord.Type.income);
-                    record.setAmount(incomePerPerson);
+                    record.setRecordType(FinancialRecord.Type.income);
+                    record.setAmount(actualReceive);
                     record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 双人订单对半分)");
                     financialRecordRepository.save(record);
+
+                    if (depositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                        FinancialRecord depositRecord = new FinancialRecord();
+                        depositRecord.setOrder(order);
+                        depositRecord.setPlayer(player);
+                        depositRecord.setRecordType(FinancialRecord.Type.deposit);
+                        depositRecord.setAmount(depositDeduct);
+                        depositRecord.setDescription("单抵押金扣除 (单号: " + order.getOrderNo() + ", 扣除" + depositDeduct + "元)");
+                        financialRecordRepository.save(depositRecord);
+                    }
                 }
             } else {
                 for (OrderSession session : latestSessionPerPlayer.values()) {
@@ -691,17 +719,43 @@ public class OrderService {
 
                     BigDecimal income = totalPlayerIncome.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
                     User player = session.getPlayer();
-                    player.setTotalIncome(player.getTotalIncome().add(income));
-                    player.setAvailableBalance(player.getAvailableBalance().add(income));
+                    BigDecimal actualReceive = income;
+                    BigDecimal depositDeduct = BigDecimal.ZERO;
+
+                    if (player.getDepositMode() == User.DepositMode.ORDER_DEDUCT
+                            && (player.getDeposit() == null || player.getDeposit().compareTo(player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200)) < 0)) {
+                        BigDecimal shouldDeduct = income.multiply(BigDecimal.valueOf(0.1));
+                        BigDecimal currentDeposit = player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO;
+                        BigDecimal depositLimit = player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200);
+                        BigDecimal remainingNeeded = depositLimit.subtract(currentDeposit);
+                        depositDeduct = shouldDeduct.min(remainingNeeded).max(BigDecimal.ZERO);
+                        actualReceive = income.subtract(depositDeduct);
+                    }
+
+                    player.setTotalIncome(player.getTotalIncome().add(actualReceive));
+                    player.setAvailableBalance(player.getAvailableBalance().add(actualReceive));
+                    if (depositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                        player.setDeposit((player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO).add(depositDeduct));
+                    }
                     userRepository.save(player);
 
                     FinancialRecord record = new FinancialRecord();
                     record.setOrder(order);
                     record.setPlayer(player);
-                    record.setType(FinancialRecord.Type.income);
-                    record.setAmount(income);
+                    record.setRecordType(FinancialRecord.Type.income);
+                    record.setAmount(actualReceive);
                     record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 占比: " + ratio.multiply(BigDecimal.valueOf(100)).setScale(2) + "%)");
                     financialRecordRepository.save(record);
+
+                    if (depositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                        FinancialRecord depositRecord = new FinancialRecord();
+                        depositRecord.setOrder(order);
+                        depositRecord.setPlayer(player);
+                        depositRecord.setRecordType(FinancialRecord.Type.deposit);
+                        depositRecord.setAmount(depositDeduct);
+                        depositRecord.setDescription("单抵押金扣除 (单号: " + order.getOrderNo() + ", 扣除" + depositDeduct + "元)");
+                        financialRecordRepository.save(depositRecord);
+                    }
                 }
             }
         }
@@ -944,7 +998,10 @@ public class OrderService {
 
             List<FinancialRecord> existingRecords = financialRecordRepository.findByOrderId(order.getId());
             List<FinancialRecord> incomeRecords = existingRecords.stream()
-                    .filter(r -> r.getType() == FinancialRecord.Type.income)
+                    .filter(r -> r.getRecordType() == FinancialRecord.Type.income)
+                    .toList();
+            List<FinancialRecord> depositRecords = existingRecords.stream()
+                    .filter(r -> r.getRecordType() == FinancialRecord.Type.deposit)
                     .toList();
 
             if (!incomeRecords.isEmpty() && newActualIncomeAmount != null) {
@@ -953,21 +1010,63 @@ public class OrderService {
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 if (newActualIncomeAmount.compareTo(oldRecordTotal) != 0) {
-                    BigDecimal incomeDiff = newActualIncomeAmount.subtract(oldRecordTotal);
+                    // 先回滚旧收入对陪玩师的影响
+                    for (FinancialRecord record : incomeRecords) {
+                        User player = record.getPlayer();
+                        player.setTotalIncome(player.getTotalIncome().subtract(record.getAmount()));
+                        player.setAvailableBalance(player.getAvailableBalance().subtract(record.getAmount()));
+                    }
+                    // 回滚旧押金对陪玩师的影响
+                    for (FinancialRecord record : depositRecords) {
+                        User player = record.getPlayer();
+                        player.setDeposit((player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO).subtract(record.getAmount()));
+                    }
 
+                    // 按比例重新分配新收入，并重新计算押金扣除
                     for (FinancialRecord record : incomeRecords) {
                         BigDecimal ratio = oldRecordTotal.compareTo(BigDecimal.ZERO) > 0
                                 ? record.getAmount().divide(oldRecordTotal, 4, java.math.RoundingMode.HALF_UP)
                                 : BigDecimal.ONE.divide(BigDecimal.valueOf(incomeRecords.size()), 4, java.math.RoundingMode.HALF_UP);
-                        BigDecimal recordDiff = incomeDiff.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
+                        BigDecimal newPlayerIncome = newActualIncomeAmount.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
 
-                        record.setAmount(record.getAmount().add(recordDiff));
+                        User player = record.getPlayer();
+                        BigDecimal actualReceive = newPlayerIncome;
+                        BigDecimal newDepositDeduct = BigDecimal.ZERO;
+
+                        if (player.getDepositMode() == User.DepositMode.ORDER_DEDUCT) {
+                            BigDecimal depositLimit = player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200);
+                            BigDecimal shouldDeduct = newPlayerIncome.multiply(BigDecimal.valueOf(0.1));
+                            BigDecimal currentDeposit = player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO;
+                            BigDecimal remainingNeeded = depositLimit.subtract(currentDeposit);
+                            newDepositDeduct = shouldDeduct.min(remainingNeeded).max(BigDecimal.ZERO);
+                            actualReceive = newPlayerIncome.subtract(newDepositDeduct);
+                        }
+
+                        // 更新收入记录
+                        record.setAmount(actualReceive);
                         record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 管理员修改后调整)");
                         financialRecordRepository.save(record);
 
-                        User player = record.getPlayer();
-                        player.setTotalIncome(player.getTotalIncome().add(recordDiff));
-                        player.setAvailableBalance(player.getAvailableBalance().add(recordDiff));
+                        // 应用新收入
+                        player.setTotalIncome(player.getTotalIncome().add(actualReceive));
+                        player.setAvailableBalance(player.getAvailableBalance().add(actualReceive));
+
+                        // 更新押金记录
+                        if (newDepositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                            FinancialRecord matchingDeposit = depositRecords.stream()
+                                    .filter(dr -> dr.getPlayer().getId().equals(player.getId()))
+                                    .findFirst()
+                                    .orElse(null);
+
+                            if (matchingDeposit != null) {
+                                matchingDeposit.setAmount(newDepositDeduct);
+                                matchingDeposit.setDescription("单抵押金扣除 (单号: " + order.getOrderNo() + ", 管理员修改后调整)");
+                                financialRecordRepository.save(matchingDeposit);
+                            }
+
+                            player.setDeposit((player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO).add(newDepositDeduct));
+                        }
+
                         userRepository.save(player);
                     }
                 }
@@ -1077,7 +1176,7 @@ public class OrderService {
             FinancialRecord record = new FinancialRecord();
             record.setOrder(saved);
             record.setPlayer(saved.getCurrentPlayer());
-            record.setType(FinancialRecord.Type.income);
+            record.setRecordType(FinancialRecord.Type.income);
             record.setAmount(income);
             record.setDescription(desc);
             financialRecordRepository.save(record);
@@ -1088,7 +1187,7 @@ public class OrderService {
             FinancialRecord record2 = new FinancialRecord();
             record2.setOrder(saved);
             record2.setPlayer(saved.getCurrentPlayer2());
-            record2.setType(FinancialRecord.Type.income);
+            record2.setRecordType(FinancialRecord.Type.income);
             record2.setAmount(income);
             record2.setDescription("订单收入 (单号: " + saved.getOrderNo() + ", 双人订单对半分)");
             financialRecordRepository.save(record2);

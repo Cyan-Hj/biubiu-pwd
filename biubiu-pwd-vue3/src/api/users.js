@@ -44,3 +44,15 @@ export const resetCustomerServicePassword = (id, data) => {
 export const deleteCustomerService = (id) => {
   return request.delete(`/users/customer-service/${id}`)
 }
+
+export const updateDeposit = (id, data) => {
+  return request.put(`/users/${id}/deposit`, data)
+}
+
+export const payDeposit = (id, data) => {
+  return request.post(`/users/${id}/deposit/pay`, data)
+}
+
+export const setMyDepositMode = (data) => {
+  return request.put('/users/me/deposit-mode', data)
+}

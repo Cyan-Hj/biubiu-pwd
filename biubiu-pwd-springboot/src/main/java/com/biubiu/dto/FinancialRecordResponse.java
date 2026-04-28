@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Builder
 public class FinancialRecordResponse {
     private Long id;
-    private FinancialRecord.Type type;
+    private FinancialRecord.Type recordType;
     private BigDecimal amount;
     private String orderNo;
     private String serviceContent;

@@ -18,5 +18,8 @@ public class PlayerResponse {
     private User.Status status;
     private BigDecimal totalIncome;
     private BigDecimal availableBalance;
+    private BigDecimal deposit;
+    private BigDecimal depositLimit;
+    private User.DepositMode depositMode;
     private Long activeOrdersCount;
 }

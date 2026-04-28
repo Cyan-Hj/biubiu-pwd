@@ -17,40 +17,40 @@ import java.util.Optional;
 @Repository
 public interface FinancialRecordRepository extends JpaRepository<FinancialRecord, Long> {
 
-    Optional<FinancialRecord> findFirstByOrderIdAndPlayerIdAndTypeOrderByIdDesc(Long orderId,
+    Optional<FinancialRecord> findFirstByOrderIdAndPlayerIdAndRecordTypeOrderByIdDesc(Long orderId,
                                                                                 Long playerId,
-                                                                                FinancialRecord.Type type);
+                                                                                FinancialRecord.Type recordType);
 
     @Query("SELECT fr FROM FinancialRecord fr WHERE fr.player.id = :playerId ORDER BY fr.createdAt DESC")
     Page<FinancialRecord> findByPlayerId(@Param("playerId") Long playerId, Pageable pageable);
 
     @Query("SELECT COALESCE(SUM(fr.amount), 0) FROM FinancialRecord fr " +
-           "WHERE fr.player.id = :playerId AND fr.type = 'income'")
+           "WHERE fr.player.id = :playerId AND fr.recordType = 'income'")
     BigDecimal sumTotalIncomeByPlayerId(@Param("playerId") Long playerId);
 
     @Query("SELECT COALESCE(SUM(fr.amount), 0) FROM FinancialRecord fr " +
-           "WHERE fr.player.id = :playerId AND fr.type = 'income' " +
+           "WHERE fr.player.id = :playerId AND fr.recordType = 'income' " +
            "AND fr.createdAt >= :startOfDay")
     BigDecimal sumTodayIncomeByPlayerId(@Param("playerId") Long playerId,
                                         @Param("startOfDay") LocalDateTime startOfDay);
 
-    @Query("SELECT COALESCE(SUM(fr.amount), 0) FROM FinancialRecord fr WHERE fr.type = 'income'")
+    @Query("SELECT COALESCE(SUM(fr.amount), 0) FROM FinancialRecord fr WHERE fr.recordType = 'income'")
     BigDecimal sumTotalIncome();
 
     @Query("SELECT COALESCE(SUM(fr.amount), 0) FROM FinancialRecord fr " +
-           "WHERE fr.type = 'income' AND fr.createdAt >= :startTime")
+           "WHERE fr.recordType = 'income' AND fr.createdAt >= :startTime")
     BigDecimal sumIncomeByCreatedAtAfter(@Param("startTime") LocalDateTime startTime);
 
     @Query("SELECT fr.player.id as playerId, fr.player.nickname as nickname, SUM(fr.amount) as totalIncome " +
            "FROM FinancialRecord fr " +
-           "WHERE fr.type = 'income' " +
+           "WHERE fr.recordType = 'income' " +
            "GROUP BY fr.player.id, fr.player.nickname " +
            "ORDER BY SUM(fr.amount) DESC")
     List<PlayerIncomeSummary> findTopPlayerIncomes(Pageable pageable);
     
     List<FinancialRecord> findByOrderId(Long orderId);
     
-    List<FinancialRecord> findByOrderIdAndType(Long orderId, FinancialRecord.Type type);
+    List<FinancialRecord> findByOrderIdAndRecordType(Long orderId, FinancialRecord.Type recordType);
     
     int deleteByOrderId(Long orderId);
     

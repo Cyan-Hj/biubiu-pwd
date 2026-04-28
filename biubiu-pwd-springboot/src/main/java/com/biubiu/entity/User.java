@@ -51,6 +51,16 @@ public class User {
     @Column(precision = 10, scale = 2)
     private BigDecimal availableBalance = BigDecimal.ZERO;
 
+    @Column(precision = 10, scale = 2)
+    private BigDecimal deposit = BigDecimal.ZERO;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal depositLimit = BigDecimal.valueOf(200);
+
+    @Column(length = 20)
+    @Enumerated(EnumType.STRING)
+    private DepositMode depositMode = DepositMode.NONE;
+
     @Column(nullable = false)
     private Boolean enabled = true;
 
@@ -69,5 +79,9 @@ public class User {
 
     public enum Status {
         pending, active, disabled
+    }
+
+    public enum DepositMode {
+        NONE, SELF_PAY, ORDER_DEDUCT
     }
 }

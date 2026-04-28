@@ -210,6 +210,10 @@
                   <span class="info-label">实际收入:</span>
                   <span class="actual-income-value">¥{{ order.actualIncomeAmount }}</span>
                 </div>
+                <div v-if="order.status === 4 && order.depositDeductAmount" class="info-row">
+                  <span class="info-label">单抵金额:</span>
+                  <span class="info-value" style="color: #e6a23c;">-¥{{ order.depositDeductAmount }}</span>
+                </div>
                 
                 <div v-if="order.status === 3" class="service-timer">
                   <div class="timer-label">正在服务中</div>
@@ -354,90 +358,28 @@
               <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="400" fixed="right">
+          <el-table-column label="操作" width="220" fixed="right">
             <template #default="{ row }">
               <div class="action-group">
-                <el-button
-                  type="info"
-                  size="small"
-                  @click="handleDetail(row)"
-                >
-                  <el-icon><View /></el-icon>详情
-                </el-button>
-                <el-button
-                  v-if="(isAdmin || isCustomerService) && row.status !== 5"
-                  type="primary"
-                  size="small"
-                  @click="handleEdit(row)"
-                >
-                  <el-icon><Edit /></el-icon>编辑
-                </el-button>
-                <el-button
-                  v-if="(isAdmin || isCustomerService) && row.status === 0"
-                  type="success"
-                  size="small"
-                  @click="handleAssign(row)"
-                >
-                  <el-icon><Position /></el-icon>派送
-                </el-button>
-                <el-button
-                  v-if="(isAdmin || isCustomerService) && row.status === 0 && !row.inGrabHall"
-                  type="primary"
-                  size="small"
-                  @click="handlePublishToHall(row)"
-                >
-                  <el-icon><Tickets /></el-icon>发布到大厅
-                </el-button>
-                <el-button
-                  v-if="(isAdmin || isCustomerService) && row.inGrabHall && row.grabStatus !== 'ASSIGNED'"
-                  type="info"
-                  size="small"
-                  @click="handleWithdrawFromHall(row)"
-                >
-                  <el-icon><RefreshLeft /></el-icon>从大厅撤回
-                </el-button>
-                <el-button
-                  v-if="(isAdmin || isCustomerService) && (row.status === 1 || row.status === 2 || row.status === 3)"
-                  type="warning"
-                  size="small"
-                  @click="handleAssign(row)"
-                >
-                  <el-icon><RefreshRight /></el-icon>改派
-                </el-button>
-                <el-button
-                  v-if="(isAdmin || isCustomerService) && (row.status === 0 || row.status === 3)"
-                  type="danger"
-                  plain
-                  size="small"
-                  @click="handlePause(row)"
-                >
-                  <el-icon><VideoPause /></el-icon>暂存
-                </el-button>
-                <el-button
-                  v-if="(isAdmin || isCustomerService) && row.status === 6"
-                  type="success"
-                  plain
-                  size="small"
-                  @click="handleResume(row)"
-                >
-                  <el-icon><RefreshRight /></el-icon>恢复
-                </el-button>
-                <el-button
-                  v-if="(isAdmin || isCustomerService) && row.status !== 4 && row.status !== 5"
-                  type="danger"
-                  size="small"
-                  @click="handleCancel(row)"
-                >
-                  <el-icon><CircleClose /></el-icon>取消
-                </el-button>
-                <el-button
-                  v-if="(isAdmin || isCustomerService) && row.status === 4 && row.auditStatus !== 1"
-                  type="success"
-                  size="small"
-                  @click="handleAuditPass(row)"
-                >
-                  <el-icon><CircleCheck /></el-icon>审核通过
-                </el-button>
+                <el-dropdown size="small" trigger="click" @command="(cmd) => handleAction(cmd, row)">
+                  <el-button type="primary" size="small">
+                    <el-icon><Operation /></el-icon>操作<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="detail"><el-icon><View /></el-icon>详情</el-dropdown-item>
+                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.status !== 5" command="edit"><el-icon><Edit /></el-icon>编辑</el-dropdown-item>
+                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.status === 0" command="assign"><el-icon><Position /></el-icon>派送</el-dropdown-item>
+                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.status === 0 && !row.inGrabHall" command="publish"><el-icon><Tickets /></el-icon>发布到大厅</el-dropdown-item>
+                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.inGrabHall && row.grabStatus !== 'ASSIGNED'" command="withdraw"><el-icon><RefreshLeft /></el-icon>从大厅撤回</el-dropdown-item>
+                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && (row.status === 1 || row.status === 2 || row.status === 3)" command="reassign"><el-icon><RefreshRight /></el-icon>改派</el-dropdown-item>
+                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && (row.status === 0 || row.status === 3)" command="pause"><el-icon><VideoPause /></el-icon>暂存</el-dropdown-item>
+                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.status === 6" command="resume"><el-icon><RefreshRight /></el-icon>恢复</el-dropdown-item>
+                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.status !== 4 && row.status !== 5" command="cancel" divided><el-icon><CircleClose /></el-icon>取消</el-dropdown-item>
+                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.status === 4 && row.auditStatus !== 1" command="audit"><el-icon><CircleCheck /></el-icon>审核通过</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
             </template>
           </el-table-column>
@@ -535,7 +477,7 @@
             </el-select>
           </el-form-item>
           <el-form-item label="注意事项" prop="precautions">
-            <el-select v-model="createForm.precautions" placeholder="请选择注意事项" style="width: 100%" clearable>
+            <el-select v-model="createForm.precautions" placeholder="请选择注意事项" style="width: 100%" clearable multiple>
               <el-option
                 v-for="item in precautions"
                 :key="item.id"
@@ -554,7 +496,7 @@
             </div>
           </el-form-item>
           <el-form-item label="单价">
-            <div class="price-display">¥{{ createForm.price_per_hour }}/h</div>
+            <el-input-number v-model="createForm.price_per_hour" :min="1" :max="1000" :precision="2" style="width: 100%" @change="calculateTotalPrice" />
           </el-form-item>
           <el-form-item v-if="createForm.customer_type === 'REGULAR' && selectedBoss && getVipDiscount(selectedBoss.vipLevel) < 1" label="折扣后">
             <div class="discounted-price">¥{{ calculatedDiscountedPrice.toFixed(2) }}</div>
@@ -832,6 +774,10 @@
               <el-input-number v-model="editForm.actual_income_amount" :min="0" :max="100000" :precision="2" size="small" style="width: 100%" />
               <div class="edit-field-hint">{{ currentOrder.playerCount === 'DOUBLE' ? '单人实际收入，不填则自动计算' : '陪玩师实际收入，不填则自动计算' }}</div>
             </el-descriptions-item>
+            <el-descriptions-item v-if="editForm.deposit_deduct_amount" label="单抵金额">
+              <span style="color: #e6a23c; font-weight: 500;">-¥{{ editForm.deposit_deduct_amount }}</span>
+              <div class="edit-field-hint">{{ currentOrder.playerCount === 'DOUBLE' ? '双人单抵合计' : '本次订单扣押金' }}</div>
+            </el-descriptions-item>
           </el-descriptions>
         </div>
       </div>
@@ -1095,7 +1041,7 @@ import { getPlayers } from '@/api/users'
 import { getLevelPrices, getSystemOptions, getSystemConfig } from '@/api/system'
 import { getBosses, getVipLevels, createBoss } from '@/api/boss'
 import dayjs from 'dayjs'
-import { Document, Plus, CircleCheck, CircleClose, Timer, Loading, Check, Position, RefreshRight, Calendar, View, User, Delete, Warning, Picture, InfoFilled, Upload, Clock, Edit, Search, Close, VideoPause, Tickets, RefreshLeft } from '@element-plus/icons-vue'
+import { Document, Plus, CircleCheck, CircleClose, Timer, Loading, Check, Position, RefreshRight, Calendar, View, User, Delete, Warning, Picture, InfoFilled, Upload, Clock, Edit, Search, Close, VideoPause, Tickets, RefreshLeft, Operation, ArrowDown } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -1234,7 +1180,7 @@ const createForm = reactive({
   boss_info: '',
   service_type: 'peiwand',
   player_level: '',
-  precautions: '',
+  precautions: [],
   service_content: '',
   player_count: 'single',
   service_hours: 1,
@@ -1365,7 +1311,8 @@ const editForm = reactive({
   actual_hours: null,
   actual_minutes: null,
   actual_total_amount: null,
-  actual_income_amount: null
+  actual_income_amount: null,
+  deposit_deduct_amount: null
 })
 
 const editRules = {}
@@ -1652,7 +1599,7 @@ const handleBossInput = (val) => {
 // 服务类型改变时重置相关字段
 const handleServiceTypeChange = () => {
   createForm.player_level = ''
-  createForm.precautions = ''
+  createForm.precautions = []
   createForm.service_content = ''
   createForm.player_count = 'single'
   createForm.service_hours = 1
@@ -1713,7 +1660,7 @@ const submitCreate = async () => {
 
     if (createForm.service_type === 'peiwand') {
       // 陪玩单
-      let precautionsText = createForm.precautions ? `【${createForm.precautions}】` : ''
+      let precautionsText = createForm.precautions && createForm.precautions.length > 0 ? `【${createForm.precautions.join('、')}】` : ''
       orderData.serviceContent = createForm.player_level + '陪玩' + precautionsText
       // 计算服务时长（小时+分钟转换为小时）
       const totalHours = (createForm.service_hours || 0) + (createForm.service_minutes || 0) / 60
@@ -1774,6 +1721,22 @@ const submitCreate = async () => {
   } catch (error) {
     ElMessage.error('创建失败')
   }
+}
+
+const handleAction = (cmd, row) => {
+  const actions = {
+    detail: handleDetail,
+    edit: handleEdit,
+    assign: handleAssign,
+    publish: handlePublishToHall,
+    withdraw: handleWithdrawFromHall,
+    reassign: handleAssign,
+    pause: handlePause,
+    resume: handleResume,
+    cancel: handleCancel,
+    audit: handleAuditPass
+  }
+  if (actions[cmd]) actions[cmd](row)
 }
 
 const handleAssign = async (row) => {
@@ -2395,9 +2358,11 @@ const handleEdit = async (row) => {
     editForm.actual_hours = null
     editForm.actual_minutes = null
   }
-  editForm.actual_total_amount = order.actualTotalAmount || null
-  editForm.actual_income_amount = order.actualIncomeAmount || null
+  const isCompleted = order.status === 4
+  editForm.actual_total_amount = isCompleted ? (order.actualTotalAmount || null) : null
+  editForm.actual_income_amount = isCompleted ? (order.actualIncomeAmount || null) : null
   editForm.expected_income_amount = order.expectedIncomeAmount || null
+  editForm.deposit_deduct_amount = isCompleted ? (order.depositDeductAmount || null) : null
   if (!platformFeeRate.value || platformFeeRate.value === 0.2) {
     getSystemConfig().then(res => {
       if (res.data?.platformFeeRate != null) {

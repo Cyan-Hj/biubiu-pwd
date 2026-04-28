@@ -27,7 +27,7 @@ public class SystemController {
     private final OrderCleanupService orderCleanupService;
 
     @GetMapping("/config")
-    @PreAuthorize("hasAnyRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
     public ApiResponse<SystemConfig> getConfig() {
         SystemConfig config = systemConfigRepository.findFirstByOrderByIdAsc()
                 .orElseGet(() -> {

@@ -497,6 +497,22 @@ public class OrderController {
                 }
             }
             
+            // 已审核订单：从财务记录获取实际到手收入（已扣押金）和单抵金额
+            if (order.getAuditStatus() != null && order.getAuditStatus() == 1) {
+                java.util.Optional<com.biubiu.entity.FinancialRecord> incomeRecord =
+                    financialRecordRepository.findFirstByOrderIdAndPlayerIdAndRecordTypeOrderByIdDesc(
+                        order.getId(), currentUser.getId(), com.biubiu.entity.FinancialRecord.Type.income);
+                if (incomeRecord.isPresent()) {
+                    response.setActualIncomeAmount(incomeRecord.get().getAmount());
+                }
+                java.util.Optional<com.biubiu.entity.FinancialRecord> depositRecord =
+                    financialRecordRepository.findFirstByOrderIdAndPlayerIdAndRecordTypeOrderByIdDesc(
+                        order.getId(), currentUser.getId(), com.biubiu.entity.FinancialRecord.Type.deposit);
+                if (depositRecord.isPresent()) {
+                    response.setDepositDeductAmount(depositRecord.get().getAmount());
+                }
+            }
+            
             // 设置incomeAmount（兼容旧逻辑）
             if (order.getStatus() == Order.Status.COMPLETED) {
                 response.setIncomeAmount(response.getActualIncomeAmount());
@@ -571,6 +587,19 @@ public class OrderController {
                     response.setActualIncomeAmount(actualPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
                 } else {
                     response.setActualIncomeAmount(actualPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+                }
+            }
+            
+            // 已审核订单：从财务记录获取单抵金额
+            if (order.getAuditStatus() != null && order.getAuditStatus() == 1) {
+                java.util.List<com.biubiu.entity.FinancialRecord> depositRecords =
+                    financialRecordRepository.findByOrderIdAndRecordType(
+                        order.getId(), com.biubiu.entity.FinancialRecord.Type.deposit);
+                java.math.BigDecimal totalDeposit = depositRecords.stream()
+                    .map(com.biubiu.entity.FinancialRecord::getAmount)
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                if (totalDeposit.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    response.setDepositDeductAmount(totalDeposit);
                 }
             }
             

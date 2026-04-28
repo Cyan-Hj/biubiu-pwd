@@ -212,6 +212,17 @@
               <span class="balance-text">¥{{ row.availableBalance || 0 }}</span>
             </template>
           </el-table-column>
+          <el-table-column label="押金" width="130">
+            <template #default="{ row }">
+              <div v-if="row.depositMode && row.depositMode !== 'NONE'">
+                <span>¥{{ row.deposit || 0 }} / {{ row.depositLimit || 200 }}</span>
+                <el-tag size="small" :type="row.depositMode === 'SELF_PAY' ? 'success' : 'warning'" style="margin-left: 4px">
+                  {{ row.depositMode === 'SELF_PAY' ? '自缴' : '单抵' }}
+                </el-tag>
+              </div>
+              <span v-else class="no-deposit">未设置</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="status" label="状态" width="90">
             <template #default="{ row }">
               <el-tag :type="getStatusType(row.status)" effect="light" size="small">
@@ -244,6 +255,9 @@
                 </el-button>
                 <el-button type="primary" size="small" @click="handleEdit(row)">
                   <el-icon><Edit /></el-icon>编辑
+                </el-button>
+                <el-button type="info" size="small" @click="handleDeposit(row)">
+                  <el-icon><Wallet /></el-icon>押金
                 </el-button>
                 <el-button type="warning" size="small" @click="handleResetPassword(row)">
                   <el-icon><Key /></el-icon>重置密码
@@ -360,17 +374,43 @@
         <el-button type="warning" @click="submitResetPassword">确认重置</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="depositDialogVisible" title="押金管理" width="500px" class="player-dialog">
+      <div v-if="currentPlayer" style="margin-bottom: 16px">
+        <strong>{{ currentPlayer.nickname }}</strong> 当前押金：¥{{ currentPlayer.deposit || 0 }}
+      </div>
+      <el-form label-width="100px">
+        <el-form-item label="押金模式">
+          <el-select v-model="depositForm.depositMode" style="width: 100%">
+            <el-option label="未设置" value="NONE" />
+            <el-option label="自缴押金" value="SELF_PAY" />
+            <el-option label="单抵押金" value="ORDER_DEDUCT" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="押金上限">
+          <el-input-number v-model="depositForm.depositLimit" :min="0" :step="50" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="当前押金">
+          <el-input-number v-model="depositForm.deposit" :min="0" :precision="2" style="width: 100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="depositDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitDepositUpdate">保存</el-button>
+        <el-button type="success" @click="submitDepositPay">自缴押金</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getPlayers, approvePlayer, updatePlayer, resetPassword, deletePlayer } from '@/api/users'
+import { getPlayers, approvePlayer, updatePlayer, resetPassword, deletePlayer, updateDeposit, payDeposit } from '@/api/users'
 import { getLevelPrices } from '@/api/system'
 import { getPendingLevelApplications, approveLevelApplication, rejectLevelApplication, batchApproveLevelApplications } from '@/api/levelUpgrade'
 import { useUserStore } from '@/stores/user'
-import { UserFilled, Search, Timer, CircleCheck, CircleClose, Check, Edit, Key, Grid, Delete, TopRight, Refresh } from '@element-plus/icons-vue'
+import { UserFilled, Search, Timer, CircleCheck, CircleClose, Check, Edit, Key, Grid, Delete, TopRight, Refresh, Wallet } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -397,6 +437,7 @@ const playerStats = ref({
 const approveDialogVisible = ref(false)
 const editDialogVisible = ref(false)
 const resetPwdDialogVisible = ref(false)
+const depositDialogVisible = ref(false)
 const currentPlayer = ref(null)
 
 const approveForm = reactive({
@@ -614,6 +655,50 @@ const handleDelete = async (row) => {
   } catch (error) {
     if (error !== 'cancel') {
     }
+  }
+}
+
+const depositForm = reactive({
+  depositMode: 'NONE',
+  deposit: 0,
+  depositLimit: 200,
+  payAmount: 200
+})
+
+const handleDeposit = (row) => {
+  currentPlayer.value = row
+  depositForm.depositMode = row.depositMode || 'NONE'
+  depositForm.deposit = row.deposit || 0
+  depositForm.depositLimit = row.depositLimit || 200
+  depositForm.payAmount = row.depositLimit || 200
+  depositDialogVisible.value = true
+}
+
+const submitDepositUpdate = async () => {
+  try {
+    await updateDeposit(currentPlayer.value.id, {
+      depositMode: depositForm.depositMode,
+      deposit: depositForm.deposit,
+      depositLimit: depositForm.depositLimit
+    })
+    ElMessage.success('押金信息更新成功')
+    depositDialogVisible.value = false
+    loadPlayers()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '更新失败')
+  }
+}
+
+const submitDepositPay = async () => {
+  try {
+    await payDeposit(currentPlayer.value.id, {
+      amount: depositForm.payAmount
+    })
+    ElMessage.success('押金缴纳成功')
+    depositDialogVisible.value = false
+    loadPlayers()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '缴纳失败')
   }
 }
 

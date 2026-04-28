@@ -137,7 +137,7 @@ public class DeletedOrderBackupService {
             DeletedOrderBackup.FinancialRecordInfo fri = new DeletedOrderBackup.FinancialRecordInfo();
             fri.setPlayerId(r.getPlayer() != null ? r.getPlayer().getId() : null);
             fri.setPlayerNickname(r.getPlayer() != null ? r.getPlayer().getNickname() : null);
-            fri.setType(r.getType() != null ? r.getType().name() : null);
+            fri.setType(r.getRecordType() != null ? r.getRecordType().name() : null);
             fri.setAmount(r.getAmount());
             fri.setDescription(r.getDescription());
             return fri;
