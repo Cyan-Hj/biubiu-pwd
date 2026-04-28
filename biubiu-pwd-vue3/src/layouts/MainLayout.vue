@@ -1,5 +1,6 @@
 <template>
   <el-container class="layout-container">
+    <!-- 桌面端侧边栏 -->
     <el-aside v-if="!isMobile" width="220px" class="aside">
       <div class="logo">
         <div class="logo-icon">
@@ -15,8 +16,8 @@
         router
         class="menu"
         background-color="transparent"
-        text-color="#5a5a7a"
-        active-text-color="#667eea"
+        text-color="#b2bec3"
+        active-text-color="#fff"
         :collapse-transition="false"
       >
         <el-menu-item index="/dashboard" class="menu-item">
@@ -65,6 +66,7 @@
       </div>
     </el-aside>
 
+    <!-- 移动端抽屉 -->
     <el-drawer
       v-if="isMobile"
       v-model="drawerVisible"
@@ -89,8 +91,8 @@
           router
           class="menu"
           background-color="transparent"
-          text-color="#5a5a7a"
-          active-text-color="#667eea"
+          text-color="#b2bec3"
+          active-text-color="#fff"
           :collapse-transition="false"
           @select="handleMenuSelect"
         >
@@ -248,15 +250,14 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .layout-container {
   height: 100vh;
-  background: linear-gradient(135deg, #f8f9fc 0%, #f0f2f8 100%);
+  background: var(--bg-body);
 }
 
 .aside {
-  background: linear-gradient(180deg, #f8f9fc 0%, #f0f2f8 50%, #e8ebf5 100%);
+  background: var(--bg-sidebar);
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 0 12px rgba(102, 126, 234, 0.08);
-  border-right: 1px solid rgba(102, 126, 234, 0.1);
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
 }
 
 .logo {
@@ -264,19 +265,19 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   padding: 0 20px;
-  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   
   .logo-icon {
     width: 40px;
     height: 40px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-right: 12px;
     flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
   }
   
   .logo-text-icon {
@@ -288,7 +289,7 @@ onUnmounted(() => {
   
   .logo-text {
     h3 {
-      color: #2d2d4a;
+      color: #fff;
       font-size: 15px;
       font-weight: 600;
       margin: 0;
@@ -297,7 +298,7 @@ onUnmounted(() => {
     }
     
     span {
-      color: #8a8ab0;
+      color: rgba(255, 255, 255, 0.5);
       font-size: 11px;
       letter-spacing: 1px;
     }
@@ -313,17 +314,18 @@ onUnmounted(() => {
     height: 48px;
     line-height: 48px;
     margin: 4px 0;
-    border-radius: 10px;
+    border-radius: var(--border-radius);
     transition: all 0.3s ease;
+    color: #b2bec3;
     
     &:hover {
-      background: rgba(102, 126, 234, 0.08) !important;
-      color: #667eea !important;
+      background: rgba(255, 255, 255, 0.06) !important;
+      color: #fff !important;
     }
     
     &.is-active {
-      background: linear-gradient(90deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.06) 100%) !important;
-      color: #667eea !important;
+      background: var(--bg-sidebar-active) !important;
+      color: #fff !important;
       font-weight: 600;
       
       &::before {
@@ -334,7 +336,7 @@ onUnmounted(() => {
         transform: translateY(-50%);
         width: 3px;
         height: 20px;
-        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(180deg, var(--primary-color) 0%, var(--primary-light) 100%);
         border-radius: 0 2px 2px 0;
       }
     }
@@ -342,6 +344,7 @@ onUnmounted(() => {
     .el-icon {
       font-size: 18px;
       margin-right: 10px;
+      color: inherit;
     }
     
     span {
@@ -353,25 +356,25 @@ onUnmounted(() => {
 
 .aside-footer {
   padding: 14px 20px;
-  border-top: 1px solid rgba(102, 126, 234, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   
   .version {
-    color: #a0a0c0;
-    font-size: 12px;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 11px;
     text-align: center;
   }
 }
 
 .header {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  box-shadow: 0 1px 4px rgba(102, 126, 234, 0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
   height: 60px;
-  border-bottom: 1px solid rgba(102, 126, 234, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .header-left {
@@ -382,15 +385,15 @@ onUnmounted(() => {
 
 .menu-toggle {
   font-size: 22px;
-  color: #2d2d4a;
+  color: var(--text-primary);
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
   transition: all 0.2s;
 
   &:hover {
-    background: rgba(102, 126, 234, 0.08);
-    color: #667eea;
+    background: var(--primary-bg);
+    color: var(--primary-color);
   }
 }
 
@@ -409,11 +412,11 @@ onUnmounted(() => {
   transition: background 0.25s;
   
   &:hover {
-    background: rgba(102, 126, 234, 0.08);
+    background: var(--primary-bg);
   }
   
   .user-avatar {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
     color: #fff;
     font-weight: 600;
     font-size: 14px;
@@ -426,17 +429,17 @@ onUnmounted(() => {
     .user-name {
       font-size: 14px;
       font-weight: 600;
-      color: #2d2d4a;
+      color: var(--text-primary);
     }
     
     .user-role {
       font-size: 12px;
-      color: #8a8ab0;
+      color: var(--text-secondary);
     }
   }
   
   .dropdown-icon {
-    color: #a0a0c0;
+    color: var(--text-tertiary);
     font-size: 14px;
   }
 }
@@ -459,7 +462,7 @@ onUnmounted(() => {
 
   .mobile-aside {
     height: 100%;
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.25);
   }
 }
 

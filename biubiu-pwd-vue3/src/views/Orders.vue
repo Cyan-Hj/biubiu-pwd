@@ -298,7 +298,7 @@
           @selection-change="handleSelectionChange"
         >
           <el-table-column v-if="isAdmin" type="selection" width="55" />
-          <el-table-column prop="orderNo" label="订单号" width="150">
+          <el-table-column prop="orderNo" label="订单号" min-width="130">
             <template #default="{ row }">
               <span :class="['order-no-text', { 'replenish-order': row.remark?.includes('【补单】') }]">{{ row.orderNo }}</span>
               <el-tag v-if="row.remark?.includes('【补单】')" size="small" type="warning" style="margin-left: 4px">补单</el-tag>
@@ -306,7 +306,7 @@
           </el-table-column>
           <el-table-column prop="bossInfo" label="老板信息" min-width="140" show-overflow-tooltip />
           <el-table-column prop="serviceContent" label="服务内容" min-width="150" show-overflow-tooltip />
-          <el-table-column label="时长/价格" width="140">
+          <el-table-column label="时长/价格" min-width="120">
             <template #default="{ row }">
               <div class="time-price">
                 <div class="time">{{ formatHoursToHM(row.serviceHours) }}</div>
@@ -314,7 +314,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="预计金额" width="150">
+          <el-table-column label="预计金额" min-width="130" align="center">
             <template #default="{ row }">
               <div class="amount-cell">
                 <span class="total-amount">¥{{ row.totalAmount }}</span>
@@ -324,7 +324,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="状态" width="110">
+          <el-table-column prop="status" label="状态" min-width="100">
             <template #default="{ row }">
               <el-tag :type="row.status === 4 ? getAuditStatusType(row.auditStatus) : getStatusType(row.status)" effect="light" size="small">
                 <el-icon v-if="row.status === 3" class="is-loading"><Loading /></el-icon>
@@ -332,7 +332,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="当前陪玩师" width="160">
+          <el-table-column label="当前陪玩师" min-width="130">
             <template #default="{ row }">
               <span :class="{ 'no-player': !row.currentPlayerNickname }">
                  {{ row.currentPlayerNickname || '待分配' }}
@@ -342,7 +342,7 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="时间" width="160">
+          <el-table-column label="时间" min-width="130">
             <template #default="{ row }">
               <div class="time-info">
                 <div class="create-time">{{ formatDate(row.createdAt) }}</div>
@@ -1004,20 +1004,20 @@
     <!-- 已删除订单记录对话框 -->
     <el-dialog v-model="deletedBackupsDialogVisible" title="已删除订单记录" width="900px" class="order-dialog">
       <el-table :data="deletedBackups" v-loading="deletedBackupsLoading" stripe max-height="500">
-        <el-table-column prop="orderNo" label="订单号" width="160" />
-        <el-table-column prop="bossInfo" label="老板信息" width="120" show-overflow-tooltip />
-        <el-table-column prop="serviceContent" label="服务内容" width="150" show-overflow-tooltip />
-        <el-table-column label="金额" width="100">
+        <el-table-column prop="orderNo" label="订单号" min-width="130" />
+        <el-table-column prop="bossInfo" label="老板信息" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="serviceContent" label="服务内容" min-width="120" show-overflow-tooltip />
+        <el-table-column label="金额" min-width="80">
           <template #default="{ row }">¥{{ row.totalAmount }}</template>
         </el-table-column>
-        <el-table-column prop="status" label="删除时状态" width="100" />
-        <el-table-column label="陪玩师" width="140" show-overflow-tooltip>
+        <el-table-column prop="status" label="删除时状态" min-width="90" />
+        <el-table-column label="陪玩师" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.currentPlayerNickname || '-' }}
             <template v-if="row.currentPlayer2Nickname"> / {{ row.currentPlayer2Nickname }}</template>
           </template>
         </el-table-column>
-        <el-table-column label="删除时间" width="160">
+        <el-table-column label="删除时间" min-width="130">
           <template #default="{ row }">{{ formatDate(row.deletedAt) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
@@ -2544,18 +2544,20 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .orders-page {
-  padding: 20px;
-  background: #f8f8fc;
+  padding: 0;
+  background: transparent;
   min-height: 100vh;
 }
 
 .order-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
   
   :deep(.el-card__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
   }
 }
 
@@ -2574,13 +2576,13 @@ onUnmounted(() => {
   
   .title-icon {
     font-size: 24px;
-    color: #409eff;
+    color: var(--primary-color);
   }
   
   .title-text {
     font-size: 20px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
   }
 }
 
@@ -2648,25 +2650,26 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 15px;
-  padding: 20px;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  transition: transform 0.2s, box-shadow 0.2s;
+  padding: 16px 18px;
+  border-radius: var(--border-radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s;
   
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card-hover);
   }
   
   .stat-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 20px;
+    flex-shrink: 0;
   }
   
   .stat-info {
@@ -2674,30 +2677,30 @@ onUnmounted(() => {
   }
   
   .stat-label {
-    font-size: 13px;
-    color: #909399;
-    margin-bottom: 5px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
   }
   
   .stat-value {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
-    color: #303133;
+    color: var(--text-primary);
   }
   
   &.pending .stat-icon {
-    background: #ecf5ff;
-    color: #409eff;
+    background: var(--info-bg);
+    color: var(--info-dark);
   }
   
   &.waiting .stat-icon {
-    background: #fdf6ec;
-    color: #e6a23c;
+    background: var(--warning-bg);
+    color: var(--warning-dark);
   }
   
   &.in-service .stat-icon {
-    background: #f0f9eb;
-    color: #67c23a;
+    background: var(--success-bg);
+    color: var(--success-color);
   }
   
   &.paused .stat-icon {
@@ -2706,18 +2709,18 @@ onUnmounted(() => {
   }
   
   &.completed .stat-icon {
-    background: #fdf6ec;
-    color: #e6a23c;
+    background: var(--warning-bg);
+    color: var(--warning-dark);
   }
   
   &.audited .stat-icon {
-    background: #f0f9eb;
-    color: #67c23a;
+    background: var(--success-bg);
+    color: var(--success-color);
   }
   
   &.cancelled .stat-icon {
-    background: #fef0f0;
-    color: #f56c6c;
+    background: var(--danger-bg);
+    color: var(--danger-dark);
   }
 }
 
@@ -2735,7 +2738,7 @@ onUnmounted(() => {
       display: flex;
       align-items: center;
       gap: 5px;
-      color: #e6a23c;
+      color: var(--warning-dark);
       font-size: 14px;
       
       .el-icon {
@@ -2753,18 +2756,18 @@ onUnmounted(() => {
   flex-wrap: wrap;
   
   .discount-text {
-    color: #e6a23c;
+    color: var(--warning-dark);
     font-weight: 600;
     font-size: 14px;
   }
   
   .discount-rate {
-    color: #909399;
+    color: var(--text-tertiary);
     font-size: 13px;
   }
   
   .balance-text {
-    color: #67c23a;
+    color: var(--success-color);
     font-weight: 600;
     font-size: 14px;
     margin-left: 10px;
@@ -2773,59 +2776,71 @@ onUnmounted(() => {
 
 .original-price {
   font-size: 14px;
-  color: #909399;
+  color: var(--text-tertiary);
   text-decoration: line-through;
 }
 
 .discounted-price {
   font-size: 18px;
-  color: #f56c6c;
+  color: var(--danger-dark);
   font-weight: 700;
 }
 
 .discount-info {
   font-size: 12px;
-  color: #e6a23c;
+  color: var(--warning-dark);
   margin-top: 5px;
 }
 
 .balance-deduct-info {
   font-size: 12px;
-  color: #67c23a;
+  color: var(--success-color);
   margin-top: 5px;
 }
 
 .order-table {
-  :deep(th) {
-    background: #f5f7fa;
-    font-weight: 600;
-    color: #606266;
+  :deep(th.el-table__cell) {
+    background: #f8f9fa !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    font-size: 13px;
+    padding: 12px 8px;
+  }
+  
+  :deep(td.el-table__cell) {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  :deep(tr:hover td.el-table__cell) {
+    background: rgba(108, 92, 231, 0.04) !important;
   }
   
   .order-no-text {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-weight: 600;
-    color: #409eff;
+    color: var(--primary-color);
   }
 
   .replenish-order {
-    color: #e6a23c !important;
+    color: var(--warning-dark) !important;
   }
   
   .time-price {
     .time {
       font-weight: 600;
-      color: #303133;
+      color: var(--text-primary);
     }
     .price {
       font-size: 12px;
-      color: #909399;
+      color: var(--text-secondary);
     }
   }
   
   .total-amount {
+    font-family: var(--font-mono);
     font-weight: 700;
-    color: #f56c6c;
+    color: var(--danger-dark);
     font-size: 15px;
   }
   
@@ -2833,26 +2848,27 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    align-items: center;
   }
   
   .actual-amount-tag {
     font-size: 12px;
-    color: #e6a23c;
+    color: var(--warning-dark);
     font-weight: 600;
   }
   
   .no-player {
-    color: #c0c4cc;
+    color: var(--text-tertiary);
     font-style: italic;
   }
   
   .time-info {
     .create-time {
-      color: #606266;
+      color: var(--text-secondary);
     }
     .schedule-time {
       font-size: 12px;
-      color: #409eff;
+      color: var(--primary-color);
     }
   }
   
@@ -2865,17 +2881,17 @@ onUnmounted(() => {
 
 // 陪玩师卡片样式
 .order-item-card {
-  border-radius: 10px;
-  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: var(--border-radius);
+  transition: all 0.3s;
   
   &:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-card-hover);
   }
   
   :deep(.el-card__header) {
-    padding: 15px 20px;
-    background: #f5f7fa;
+    padding: 14px 18px;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
   }
 }
 
@@ -2886,9 +2902,9 @@ onUnmounted(() => {
 }
 
 .order-no {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
-  color: #409eff;
+  color: var(--primary-color);
   font-size: 15px;
 }
 
@@ -2899,13 +2915,13 @@ onUnmounted(() => {
     
     .info-label {
       width: 80px;
-      color: #909399;
+      color: var(--text-tertiary);
       font-size: 13px;
     }
     
     .info-value {
       flex: 1;
-      color: #303133;
+      color: var(--text-secondary);
       font-size: 14px;
     }
   }
@@ -2914,35 +2930,35 @@ onUnmounted(() => {
     .price-value {
       font-size: 18px;
       font-weight: 700;
-      color: #f56c6c;
+      color: var(--danger-dark);
     }
   }
   
   .income-row {
     .income-value {
       font-weight: 600;
-      color: #67c23a;
+      color: var(--success-color);
     }
   }
   
   .actual-income-row {
     .actual-income-value {
       font-weight: 700;
-      color: #f56c6c;
+      color: var(--danger-dark);
       font-size: 16px;
     }
   }
   
   .actual-hours {
-    color: #409eff;
+    color: var(--primary-color);
     font-weight: 600;
   }
   
   .service-timer {
     margin: 15px 0;
     padding: 15px;
-    background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
-    border-radius: 8px;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    border-radius: var(--border-radius);
     text-align: center;
     color: #fff;
     
@@ -2955,7 +2971,7 @@ onUnmounted(() => {
     .timer-value {
       font-size: 28px;
       font-weight: 700;
-      font-family: monospace;
+      font-family: var(--font-mono);
     }
   }
   
@@ -2978,20 +2994,6 @@ onUnmounted(() => {
 
 // 对话框样式
 .order-dialog {
-  :deep(.el-dialog__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
-    
-    .el-dialog__title {
-      font-weight: 600;
-    }
-  }
-  
-  :deep(.el-dialog__body) {
-    padding: 25px 20px;
-  }
-  
-  // 时长输入组样式
   .duration-input-group {
     display: flex;
     align-items: center;
@@ -2999,13 +3001,13 @@ onUnmounted(() => {
     flex-wrap: wrap;
     
     .duration-unit {
-      color: #606266;
+      color: var(--text-secondary);
       font-size: 14px;
       white-space: nowrap;
     }
     
     .duration-total {
-      color: #409eff;
+      color: var(--primary-color);
       font-size: 14px;
       font-weight: 500;
       margin-left: 10px;
@@ -3119,13 +3121,13 @@ onUnmounted(() => {
 
         &:hover,
         &:focus {
-          border-color: #409eff;
-          background: #f0f7ff;
+          border-color: var(--primary-color);
+          background: var(--primary-bg);
         }
 
         &:active {
-          border-color: #409eff;
-          background: #e6f2ff;
+          border-color: var(--primary-color);
+          background: rgba(108, 92, 231, 0.12);
         }
 
         .upload-content {
@@ -3136,17 +3138,17 @@ onUnmounted(() => {
 
           .upload-main-icon {
             font-size: 24px;
-            color: #409eff;
+            color: var(--primary-color);
           }
 
           .upload-main-text {
             font-size: 14px;
-            color: #606266;
+            color: var(--text-secondary);
           }
 
           .upload-sub-text {
             font-size: 12px;
-            color: #909399;
+            color: var(--text-tertiary);
           }
         }
       }
@@ -3176,24 +3178,24 @@ onUnmounted(() => {
   .total-price {
     font-size: 24px;
     font-weight: 700;
-    color: #f56c6c;
+    color: var(--danger-dark);
   }
   .price-display {
     font-size: 16px;
-    color: #606266;
+    color: var(--text-secondary);
     font-weight: 500;
   }
   .auto-price-tip {
     font-size: 12px;
-    color: #909399;
+    color: var(--text-tertiary);
     margin-top: 5px;
   }
 }
 
 .order-no-display {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-weight: 600;
-  color: #409eff;
+  color: var(--primary-color);
   font-size: 14px;
 }
 
@@ -3208,10 +3210,10 @@ onUnmounted(() => {
     .edit-section-title {
       font-size: 14px;
       font-weight: 600;
-      color: #303133;
+      color: var(--text-primary);
       margin-bottom: 8px;
       padding-left: 8px;
-      border-left: 3px solid #409eff;
+      border-left: 3px solid var(--primary-color);
     }
   }
 
@@ -3221,7 +3223,7 @@ onUnmounted(() => {
     gap: 6px;
 
     .edit-duration-unit {
-      color: #606266;
+      color: var(--text-secondary);
       font-size: 13px;
     }
   }
@@ -3229,11 +3231,11 @@ onUnmounted(() => {
   .edit-field-hint {
     margin-top: 4px;
     font-size: 12px;
-    color: #909399;
+    color: var(--text-tertiary);
   }
 
   .no-player {
-    color: #c0c4cc;
+    color: var(--text-tertiary);
     font-style: italic;
   }
 
@@ -3254,24 +3256,24 @@ onUnmounted(() => {
 }
 
 .cancel-reason {
-  color: #f56c6c;
+  color: var(--danger-dark);
   font-size: 13px;
 }
 
 .detail-price {
   font-size: 18px;
   font-weight: 700;
-  color: #f56c6c;
+  color: var(--danger-dark);
 }
 
 .detail-actual-price {
   font-size: 18px;
   font-weight: 700;
-  color: #e6a23c;
+  color: var(--warning-dark);
 }
 
 .detail-cancel-reason {
-  color: #f56c6c;
+  color: var(--danger-dark);
   font-weight: 500;
 }
 
@@ -3282,32 +3284,32 @@ onUnmounted(() => {
   
   .player-session-item {
     padding: 12px 15px;
-    background: #f5f7fa;
-    border-radius: 8px;
-    border-left: 3px solid #409eff;
+    background: #f8f9fa;
+    border-radius: var(--border-radius);
+    border-left: 3px solid var(--primary-color);
     
     .player-name {
       font-weight: 600;
       font-size: 15px;
-      color: #303133;
+      color: var(--text-primary);
       margin-bottom: 8px;
       display: flex;
       align-items: center;
       gap: 5px;
       
       .el-icon {
-        color: #409eff;
+        color: var(--primary-color);
       }
     }
     
     .session-detail {
       font-size: 13px;
-      color: #606266;
+      color: var(--text-secondary);
       margin: 4px 0;
       padding-left: 20px;
       
       .session-label {
-        color: #909399;
+        color: var(--text-tertiary);
         margin-right: 5px;
       }
     }
@@ -3320,23 +3322,23 @@ onUnmounted(() => {
 
   .pause-icon {
     font-size: 48px;
-    color: #e6a23c;
+    color: var(--warning-dark);
     margin-bottom: 16px;
   }
 
   .pause-tip {
     font-size: 16px;
-    color: #303133;
+    color: var(--text-primary);
     margin: 0 0 8px;
 
     strong {
-      color: #e6a23c;
+      color: var(--warning-dark);
     }
   }
 
   .pause-sub-tip {
     font-size: 13px;
-    color: #909399;
+    color: var(--text-tertiary);
     margin: 0;
   }
 }
@@ -3349,15 +3351,15 @@ onUnmounted(() => {
   .detail-screenshot-img {
     width: 160px;
     height: 110px;
-    border-radius: 8px;
+    border-radius: var(--border-radius);
     object-fit: cover;
     border: 1px solid #e4e7ed;
     cursor: pointer;
     transition: all 0.3s ease;
     
     &:hover {
-      border-color: #409eff;
-      box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+      border-color: var(--primary-color);
+      box-shadow: 0 4px 12px rgba(108, 92, 231, 0.2);
       transform: translateY(-2px);
     }
   }
@@ -3407,9 +3409,9 @@ onUnmounted(() => {
     gap: 6px;
 
     .player-option-no {
-      font-family: monospace;
+      font-family: var(--font-mono);
       font-weight: 600;
-      color: #409eff;
+      color: var(--primary-color);
       font-size: 12px;
     }
   }
@@ -3433,9 +3435,9 @@ onUnmounted(() => {
     gap: 6px;
 
     .boss-suggestion-no {
-      font-family: monospace;
+      font-family: var(--font-mono);
       font-weight: 600;
-      color: #409eff;
+      color: var(--primary-color);
       font-size: 12px;
     }
   }
@@ -3447,7 +3449,7 @@ onUnmounted(() => {
 
     .boss-suggestion-balance {
       font-size: 12px;
-      color: #909399;
+      color: var(--text-tertiary);
     }
   }
 }
@@ -3463,9 +3465,9 @@ onUnmounted(() => {
   gap: 6px;
   margin-top: 8px;
   padding: 8px 12px;
-  background: #f0f9eb;
-  border-radius: 6px;
-  color: #67c23a;
+  background: var(--success-bg);
+  border-radius: var(--border-radius-sm);
+  color: var(--success-color);
   font-size: 13px;
 
   .el-icon {
@@ -3475,14 +3477,14 @@ onUnmounted(() => {
 
 @media screen and (max-width: 768px) {
   .orders-page {
-    padding: 10px;
+    padding: 0;
   }
 
   .order-card {
-    border-radius: 8px;
+    border-radius: var(--border-radius);
 
     :deep(.el-card__header) {
-      padding: 12px;
+      padding: 12px 14px;
     }
 
     :deep(.el-card__body) {
@@ -3578,18 +3580,18 @@ onUnmounted(() => {
     gap: 10px;
 
     .stat-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      font-size: 20px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 16px;
     }
 
     .stat-value {
-      font-size: 20px;
+      font-size: 18px;
     }
 
     .stat-label {
-      font-size: 12px;
+      font-size: 11px;
     }
   }
 
@@ -3671,38 +3673,6 @@ onUnmounted(() => {
   }
 
   .order-dialog {
-    :deep(.el-dialog) {
-      width: 95% !important;
-      margin: 10px auto !important;
-      border-radius: 12px;
-    }
-
-    :deep(.el-dialog__header) {
-      padding: 14px;
-    }
-
-    :deep(.el-dialog__body) {
-      padding: 14px;
-      max-height: 65vh;
-      overflow-y: auto;
-    }
-
-    :deep(.el-dialog__footer) {
-      padding: 12px 14px;
-    }
-
-    :deep(.el-form-item__label) {
-      float: none;
-      display: block;
-      text-align: left;
-      padding-bottom: 4px;
-      width: auto !important;
-    }
-
-    :deep(.el-form-item__content) {
-      margin-left: 0 !important;
-    }
-
     .duration-input-group {
       flex-wrap: wrap;
       gap: 8px;
@@ -3768,6 +3738,38 @@ onUnmounted(() => {
           font-size: 13px;
         }
       }
+    }
+  }
+
+  .edit-order-dialog {
+    .edit-section {
+      .edit-section-title {
+        font-size: 13px;
+      }
+    }
+
+    :deep(.el-input-number) {
+      width: 100% !important;
+    }
+
+    :deep(.el-input__inner) {
+      font-size: 13px;
+    }
+
+    .edit-duration-group {
+      gap: 4px;
+
+      :deep(.el-input-number) {
+        width: 75px !important;
+      }
+
+      .edit-duration-unit {
+        font-size: 12px;
+      }
+    }
+
+    .edit-field-hint {
+      font-size: 11px;
     }
   }
 

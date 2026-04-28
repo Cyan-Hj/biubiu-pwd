@@ -1026,18 +1026,20 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .settings-page {
-  padding: 20px;
-  background: #f8f8fc;
+  padding: 0;
+  background: transparent;
   min-height: 100vh;
 }
 
 .settings-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
   
   :deep(.el-card__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
   }
 }
 
@@ -1054,13 +1056,13 @@ onMounted(() => {
   
   .title-icon {
     font-size: 24px;
-    color: #ff6b6b;
+    color: var(--primary-color);
   }
   
   .title-text {
     font-size: 20px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
   }
 }
 
@@ -1088,22 +1090,22 @@ onMounted(() => {
     margin: 0 0 20px 0;
     font-size: 16px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
   }
   
   .unit-label {
     margin-left: 10px;
     font-size: 14px;
-    color: #606266;
+    color: var(--text-secondary);
   }
   
   .form-tip {
-    color: #909399;
+    color: var(--text-tertiary);
     font-size: 13px;
     margin-top: 8px;
     
     &.danger {
-      color: #f56c6c;
+      color: var(--danger-dark);
     }
   }
 }
@@ -1115,16 +1117,27 @@ onMounted(() => {
   margin-bottom: 20px;
   
   .level-tip {
-    color: #909399;
+    color: var(--text-tertiary);
     font-size: 13px;
   }
 }
 
 .level-table {
-  :deep(th) {
-    background: #f8f8fc;
-    font-weight: 600;
-    color: #606266;
+  :deep(th.el-table__cell) {
+    background: #f8f9fa !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    font-size: 13px;
+    padding: 12px 8px;
+  }
+
+  :deep(td.el-table__cell) {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  :deep(tr:hover td.el-table__cell) {
+    background: rgba(108, 92, 231, 0.04) !important;
   }
   
   :deep(.el-tag) {
@@ -1134,7 +1147,7 @@ onMounted(() => {
   
   .sort-number {
     font-weight: 600;
-    color: #ff6b6b;
+    color: var(--primary-color);
     font-size: 14px;
   }
 }
@@ -1157,27 +1170,63 @@ onMounted(() => {
   align-items: center;
   gap: 15px;
   padding: 15px;
-  background: #f8f8fc;
-  border-radius: 8px;
+  background: #f8f9fa;
+  border-radius: var(--border-radius);
   
   .sort-tip {
-    color: #909399;
+    color: var(--text-tertiary);
     font-size: 13px;
   }
 }
 
 .level-dialog {
-  :deep(.el-dialog__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
-    
-    .el-dialog__title {
-      font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .settings-card {
+    :deep(.el-card__header) {
+      padding: 12px 14px;
     }
   }
-  
-  :deep(.el-dialog__body) {
-    padding: 25px 20px;
+
+  .header-title {
+    .title-icon {
+      font-size: 20px;
+    }
+
+    .title-text {
+      font-size: 18px;
+    }
+  }
+
+  .config-form {
+    max-width: 100%;
+  }
+
+  .sort-save-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-title {
+    .title-icon {
+      font-size: 18px;
+    }
+
+    .title-text {
+      font-size: 16px;
+    }
+  }
+
+  .settings-tabs {
+    :deep(.el-tabs__item) {
+      font-size: 13px;
+      padding: 0 12px;
+      height: 38px;
+      line-height: 38px;
+    }
   }
 }
 </style>

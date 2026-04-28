@@ -857,20 +857,21 @@ onMounted(() => {
 .card-header {
   font-size: 16px;
   font-weight: 600;
-  color: #2d2d4a;
+  color: var(--text-primary);
 }
 
 .info-card,
 .password-card,
 .player-card {
-  border-radius: 16px;
+  border-radius: var(--border-radius-lg);
   border: none;
-  background: #fff;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
   transition: all 0.3s ease;
 
   :deep(.el-card__header) {
-    padding: 20px 24px;
-    border-bottom: 1px solid #f0f0f5;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
   }
 
   :deep(.el-card__body) {
@@ -892,18 +893,18 @@ onMounted(() => {
     border-bottom: 1px solid #f5f5f8;
 
     .user-avatar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
       color: #fff;
       font-size: 28px;
       font-weight: 600;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
     }
 
     .avatar-info {
       h3 {
         margin: 0 0 8px 0;
         font-size: 20px;
-        color: #2d2d4a;
+        color: var(--text-primary);
         font-weight: 600;
       }
     }
@@ -922,14 +923,14 @@ onMounted(() => {
       }
 
       .info-label {
-        color: #8a8ab0;
+        color: var(--text-tertiary);
         font-size: 14px;
         flex-shrink: 0;
         width: 70px;
       }
 
       .info-value {
-        color: #2d2d4a;
+        color: var(--text-primary);
         font-size: 14px;
         font-weight: 500;
 
@@ -1000,7 +1001,7 @@ onMounted(() => {
       width: 40px;
       height: 40px;
       border-radius: 10px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
       display: flex;
       align-items: center;
       justify-content: center;

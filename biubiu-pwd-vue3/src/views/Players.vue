@@ -170,12 +170,12 @@
 
       <div class="table-container">
         <el-table :data="players" v-loading="loading" stripe class="player-table">
-          <el-table-column prop="playerNo" label="编号" width="100" align="center">
+          <el-table-column prop="playerNo" label="编号" min-width="80" align="center">
             <template #default="{ row }">
               <span class="player-no">{{ row.playerNo || '-' }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="nickname" label="昵称" min-width="100" show-overflow-tooltip>
+          <el-table-column prop="nickname" label="昵称" min-width="120" show-overflow-tooltip>
             <template #default="{ row }">
               <div class="nickname-cell">
                 <el-avatar :size="28" :src="row.avatar" class="avatar">
@@ -185,45 +185,45 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="phone" label="手机号" width="120">
+          <el-table-column prop="phone" label="手机号" min-width="110">
             <template #default="{ row }">
               <span class="phone-text">{{ row.phone }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="level" label="等级" width="90">
+          <el-table-column prop="level" label="等级" min-width="80">
             <template #default="{ row }">
               <el-tag :type="getLevelType(row.level)" effect="light" size="small">
                 {{ row.level }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="pricePerHour" label="单价" width="90">
+          <el-table-column prop="pricePerHour" label="单价" min-width="85">
             <template #default="{ row }">
               <span class="price-text">¥{{ row.pricePerHour }}/h</span>
             </template>
           </el-table-column>
-          <el-table-column prop="totalIncome" label="累计收入" width="100">
+          <el-table-column prop="totalIncome" label="累计收入" min-width="95">
             <template #default="{ row }">
               <span class="income-text">¥{{ row.totalIncome || 0 }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="availableBalance" label="可提现" width="100">
+          <el-table-column prop="availableBalance" label="可提现" min-width="85">
             <template #default="{ row }">
               <span class="balance-text">¥{{ row.availableBalance || 0 }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="押金" width="130">
+          <el-table-column label="押金" min-width="120">
             <template #default="{ row }">
-              <div v-if="row.depositMode && row.depositMode !== 'NONE'">
-                <span>¥{{ row.deposit || 0 }} / {{ row.depositLimit || 200 }}</span>
-                <el-tag size="small" :type="row.depositMode === 'SELF_PAY' ? 'success' : 'warning'" style="margin-left: 4px">
+              <div v-if="row.depositMode && row.depositMode !== 'NONE'" class="deposit-cell">
+                <span class="deposit-amount">¥{{ row.deposit || 0 }} / {{ row.depositLimit || 200 }}</span>
+                <el-tag size="small" :type="row.depositMode === 'SELF_PAY' ? 'success' : 'warning'">
                   {{ row.depositMode === 'SELF_PAY' ? '自缴' : '单抵' }}
                 </el-tag>
               </div>
               <span v-else class="no-deposit">未设置</span>
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="状态" width="90">
+          <el-table-column prop="status" label="状态" min-width="90">
             <template #default="{ row }">
               <el-tag :type="getStatusType(row.status)" effect="light" size="small">
                 <el-icon v-if="row.status === 'pending'"><Timer /></el-icon>
@@ -233,7 +233,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="activeOrdersCount" label="进行中" width="80" align="center">
+          <el-table-column prop="activeOrdersCount" label="进行中" min-width="75" align="center">
             <template #default="{ row }">
               <el-badge :value="row.activeOrdersCount" :hidden="row.activeOrdersCount === 0 || row.activeOrdersCount === 1" type="primary">
                 <span :class="['order-count', { 'idle': row.activeOrdersCount === 0, 'in-service': row.activeOrdersCount === 1 }]">
@@ -242,29 +242,23 @@
               </el-badge>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="280" fixed="right">
+          <el-table-column label="操作" width="140" fixed="right">
             <template #default="{ row }">
               <div class="action-group" v-if="isAdmin">
-                <el-button
-                  v-if="row.status === 'pending'"
-                  type="success"
-                  size="small"
-                  @click="handleApprove(row)"
-                >
-                  <el-icon><Check /></el-icon>审核
-                </el-button>
-                <el-button type="primary" size="small" @click="handleEdit(row)">
-                  <el-icon><Edit /></el-icon>编辑
-                </el-button>
-                <el-button type="info" size="small" @click="handleDeposit(row)">
-                  <el-icon><Wallet /></el-icon>押金
-                </el-button>
-                <el-button type="warning" size="small" @click="handleResetPassword(row)">
-                  <el-icon><Key /></el-icon>重置密码
-                </el-button>
-                <el-button type="danger" size="small" @click="handleDelete(row)">
-                  <el-icon><Delete /></el-icon>删除
-                </el-button>
+                <el-dropdown size="small" trigger="click" @command="(cmd) => handlePlayerAction(cmd, row)">
+                  <el-button type="primary" size="small">
+                    <el-icon><Operation /></el-icon>操作<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item v-if="row.status === 'pending'" command="approve"><el-icon><Check /></el-icon>审核</el-dropdown-item>
+                      <el-dropdown-item command="edit"><el-icon><Edit /></el-icon>编辑</el-dropdown-item>
+                      <el-dropdown-item command="deposit"><el-icon><Wallet /></el-icon>押金</el-dropdown-item>
+                      <el-dropdown-item command="resetPwd"><el-icon><Key /></el-icon>重置密码</el-dropdown-item>
+                      <el-dropdown-item command="delete" divided><el-icon><Delete /></el-icon>删除</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
               <span v-else-if="isCustomerService" class="no-action">-</span>
             </template>
@@ -410,7 +404,7 @@ import { getPlayers, approvePlayer, updatePlayer, resetPassword, deletePlayer, u
 import { getLevelPrices } from '@/api/system'
 import { getPendingLevelApplications, approveLevelApplication, rejectLevelApplication, batchApproveLevelApplications } from '@/api/levelUpgrade'
 import { useUserStore } from '@/stores/user'
-import { UserFilled, Search, Timer, CircleCheck, CircleClose, Check, Edit, Key, Grid, Delete, TopRight, Refresh, Wallet } from '@element-plus/icons-vue'
+import { UserFilled, Search, Timer, CircleCheck, CircleClose, Check, Edit, Key, Grid, Delete, TopRight, Refresh, Wallet, Operation, ArrowDown } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -658,6 +652,17 @@ const handleDelete = async (row) => {
   }
 }
 
+const handlePlayerAction = (cmd, row) => {
+  const actions = {
+    approve: handleApprove,
+    edit: handleEdit,
+    deposit: handleDeposit,
+    resetPwd: handleResetPassword,
+    delete: handleDelete
+  }
+  if (actions[cmd]) actions[cmd](row)
+}
+
 const depositForm = reactive({
   depositMode: 'NONE',
   deposit: 0,
@@ -768,18 +773,20 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .players-page {
-  padding: 20px;
-  background: #f8f8fc;
+  padding: 0;
+  background: transparent;
   min-height: 100vh;
 }
 
 .player-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
 
   :deep(.el-card__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
   }
 }
 
@@ -798,13 +805,13 @@ onMounted(() => {
 
   .title-icon {
     font-size: 24px;
-    color: #ff6b6b;
+    color: var(--primary-color);
   }
 
   .title-text {
     font-size: 20px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
   }
 }
 
@@ -834,7 +841,7 @@ onMounted(() => {
 
   .filter-label {
     font-size: 14px;
-    color: #606266;
+    color: var(--text-secondary);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -884,26 +891,27 @@ onMounted(() => {
   min-width: 150px;
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 20px;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  transition: transform 0.2s, box-shadow 0.2s;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--border-radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card-hover);
   }
 
   .stat-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 20px;
+    flex-shrink: 0;
   }
 
   .stat-info {
@@ -911,70 +919,71 @@ onMounted(() => {
   }
 
   .stat-label {
-    font-size: 13px;
-    color: #909399;
-    margin-bottom: 5px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
   }
 
   .stat-value {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
-    color: #303133;
+    color: var(--text-primary);
   }
 
   &.pending .stat-icon {
-    background: #fdf6ec;
-    color: #e6a23c;
+    background: var(--warning-bg);
+    color: var(--warning-dark);
   }
 
   &.active .stat-icon {
-    background: #fff8f0;
-    color: #f0c27f;
+    background: var(--warning-bg);
+    color: var(--warning-dark);
   }
 
   &.disabled .stat-icon {
-    background: #fef0f0;
-    color: #f56c6c;
+    background: var(--danger-bg);
+    color: var(--danger-dark);
   }
 
   &.total .stat-icon {
-    background: #fff5f5;
-    color: #ff6b6b;
+    background: var(--primary-bg);
+    color: var(--primary-color);
   }
 
   &.upgrade {
-    border: 2px solid #e8f4e8;
-    background: linear-gradient(135deg, #f0f9eb 0%, #fff 100%);
+    border: 2px solid rgba(0, 184, 148, 0.2);
+    background: linear-gradient(135deg, var(--success-bg) 0%, var(--bg-card) 100%);
 
     .stat-icon {
-      background: #f0f9eb;
-      color: #67c23a;
+      background: var(--success-bg);
+      color: var(--success-color);
     }
 
     .stat-value {
-      color: #67c23a;
+      color: var(--success-color);
     }
   }
 }
 
 .upgrade-panel {
   margin-bottom: 24px;
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e8f4e8;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid rgba(0, 184, 148, 0.2);
   overflow: hidden;
+  box-shadow: var(--shadow-card);
 
   .upgrade-panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 14px 20px;
-    background: linear-gradient(135deg, #f0f9eb 0%, #e8f5e9 100%);
+    background: linear-gradient(90deg, var(--success-bg) 0%, transparent 100%);
 
     .upgrade-panel-title {
       font-size: 15px;
       font-weight: 600;
-      color: #2d6a2e;
+      color: var(--success-color);
       display: flex;
       align-items: center;
       gap: 6px;
@@ -990,9 +999,10 @@ onMounted(() => {
     border-radius: 0;
 
     th.el-table__cell {
-      background: #fafbfc;
-      font-weight: 600;
-      color: #606266;
+      background: #f8f9fa !important;
+      font-weight: 600 !important;
+      color: var(--text-primary) !important;
+      font-size: 13px;
     }
   }
 }
@@ -1004,18 +1014,27 @@ onMounted(() => {
 }
 
 .player-table {
-  min-width: 950px;
+  :deep(th.el-table__cell) {
+    background: #f8f9fa !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    font-size: 13px;
+    padding: 12px 8px;
+  }
 
-  :deep(th) {
-    background: #f8f8fc;
-    font-weight: 600;
-    color: #606266;
+  :deep(td.el-table__cell) {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  :deep(tr:hover td.el-table__cell) {
+    background: rgba(108, 92, 231, 0.04) !important;
   }
 
   .player-no {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-weight: 600;
-    color: #ff6b6b;
+    color: var(--primary-color);
     font-size: 13px;
   }
 
@@ -1030,41 +1049,52 @@ onMounted(() => {
 
     .nickname-text {
       font-weight: 500;
-      color: #303133;
+      color: var(--text-primary);
     }
   }
 
   .phone-text {
-    font-family: monospace;
-    color: #606266;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
   }
 
   .price-text {
     font-weight: 600;
-    color: #ff6b6b;
+    color: var(--danger-dark);
   }
 
   .income-text {
     font-weight: 600;
-    color: #f0c27f;
+    color: var(--success-color);
   }
 
   .balance-text {
     font-weight: 600;
-    color: #e6a23c;
+    color: var(--warning-dark);
+  }
+
+  .deposit-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .deposit-amount {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
   }
 
   .order-count {
     font-weight: 600;
-    color: #606266;
+    color: var(--text-secondary);
 
     &.idle {
-      color: #f0c27f;
+      color: var(--warning-dark);
       font-size: 12px;
     }
 
     &.in-service {
-      color: #ff6b6b;
+      color: var(--danger-dark);
       font-size: 12px;
     }
   }
@@ -1076,7 +1106,7 @@ onMounted(() => {
   }
 
   .no-action {
-    color: #c0c4cc;
+    color: var(--text-tertiary);
     text-align: center;
     display: block;
   }
@@ -1087,52 +1117,33 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
-.player-dialog {
-  :deep(.el-dialog__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
-
-    .el-dialog__title {
-      font-weight: 600;
-    }
-  }
-
-  :deep(.el-dialog__body) {
-    padding: 25px 20px;
-  }
-}
-
 .dialog-form {
   .player-info {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 10px;
-    background: #f8f8fc;
-    border-radius: 8px;
+    background: #f8f9fa;
+    border-radius: var(--border-radius);
 
     .player-name {
       font-weight: 600;
       font-size: 15px;
-      color: #303133;
+      color: var(--text-primary);
     }
   }
 
   .form-tip {
-    color: #909399;
+    color: var(--text-tertiary);
     font-size: 12px;
     margin-top: 5px;
   }
 }
 
 @media (max-width: 768px) {
-  .players-page {
-    padding: 12px;
-  }
-
   .player-card {
     :deep(.el-card__header) {
-      padding: 16px;
+      padding: 12px 14px;
     }
   }
 
@@ -1189,8 +1200,8 @@ onMounted(() => {
     .stat-icon {
       width: 36px;
       height: 36px;
-      border-radius: 8px;
-      font-size: 18px;
+      border-radius: 50%;
+      font-size: 16px;
     }
 
     .stat-info {
@@ -1236,7 +1247,7 @@ onMounted(() => {
 
   .table-container {
     margin-top: 16px;
-    border-radius: 8px;
+    border-radius: var(--border-radius);
     overflow-x: auto;
   }
 
@@ -1280,30 +1291,11 @@ onMounted(() => {
     margin-top: 16px;
     justify-content: center;
   }
-
-  .player-dialog {
-    :deep(.el-dialog) {
-      width: 90% !important;
-      max-width: 450px;
-    }
-
-    :deep(.el-dialog__header) {
-      padding: 16px;
-    }
-
-    :deep(.el-dialog__body) {
-      padding: 16px;
-    }
-  }
 }
 
 @media (max-width: 480px) {
-  .players-page {
-    padding: 8px;
-  }
-
   .player-card {
-    border-radius: 10px;
+    border-radius: var(--border-radius);
 
     :deep(.el-card__header) {
       padding: 12px;
@@ -1378,8 +1370,8 @@ onMounted(() => {
     .stat-icon {
       width: 32px;
       height: 32px;
-      border-radius: 6px;
-      font-size: 16px;
+      border-radius: 50%;
+      font-size: 14px;
     }
 
     .stat-info {
@@ -1396,7 +1388,7 @@ onMounted(() => {
 
   .upgrade-panel {
     margin-bottom: 12px;
-    border-radius: 8px;
+    border-radius: var(--border-radius);
 
     .upgrade-panel-header {
       padding: 10px 12px;
@@ -1431,7 +1423,6 @@ onMounted(() => {
 
   .table-container {
     margin-top: 12px;
-    border-radius: 6px;
   }
 
   .player-table {
@@ -1499,26 +1490,6 @@ onMounted(() => {
       width: 100%;
       text-align: center;
       margin-bottom: 8px;
-    }
-  }
-
-  .player-dialog {
-    :deep(.el-dialog) {
-      width: 95% !important;
-      max-width: none;
-      margin: 10px auto;
-    }
-
-    :deep(.el-dialog__header) {
-      padding: 12px 16px;
-    }
-
-    :deep(.el-dialog__body) {
-      padding: 12px;
-    }
-
-    :deep(.el-dialog__footer) {
-      padding: 12px 16px;
     }
   }
 

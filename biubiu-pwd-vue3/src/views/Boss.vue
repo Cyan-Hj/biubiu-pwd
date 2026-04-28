@@ -93,17 +93,17 @@
 
       <!-- 老板列表 -->
       <el-table :data="bosses" v-loading="loading" stripe class="boss-table">
-        <el-table-column prop="bossNo" label="编号" width="100">
+        <el-table-column prop="bossNo" label="编号" min-width="80">
           <template #default="{ row }">
             <span class="boss-no">{{ row.bossNo || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="name" label="姓名" width="120">
+        <el-table-column prop="name" label="姓名" min-width="100">
           <template #default="{ row }">
             <span class="boss-name">{{ row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="联系方式" width="180">
+        <el-table-column label="联系方式" min-width="140">
           <template #default="{ row }">
             <div class="contact-info">
               <el-tag size="small" :type="row.contactType === 'WECHAT' ? 'success' : 'primary'">
@@ -113,31 +113,31 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="vipLevel" label="VIP等级" width="120">
+        <el-table-column prop="vipLevel" label="VIP等级" min-width="100">
           <template #default="{ row }">
             <el-tag :type="getVipTagType(row.vipLevel)" effect="dark" size="small">
               {{ getVipName(row.vipLevel) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="customerType" label="客户分类" width="100">
+        <el-table-column prop="customerType" label="客户分类" min-width="85">
           <template #default="{ row }">
             <el-tag :type="row.customerType === 'REGULAR' ? 'warning' : 'info'" size="small">
               {{ row.customerType === 'REGULAR' ? '固定客' : '散客' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="balance" label="预存余额" width="130">
+        <el-table-column prop="balance" label="预存余额" min-width="100">
           <template #default="{ row }">
             <span class="balance" :class="{ 'zero': row.balance <= 0 }">¥{{ formatNumber(row.balance) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="totalConsumption" label="累计消费" width="130">
+        <el-table-column prop="totalConsumption" label="累计消费" min-width="100">
           <template #default="{ row }">
             <span class="consumption">¥{{ formatNumber(row.totalConsumption) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="enabled" label="状态" width="90">
+        <el-table-column prop="enabled" label="状态" min-width="80">
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'danger'" size="small">
               {{ row.enabled ? '启用' : '禁用' }}
@@ -286,26 +286,26 @@
         <span class="balance">当前余额：¥{{ formatNumber(currentBoss?.balance) }}</span>
       </div>
       <el-table :data="records" v-loading="recordsLoading" stripe>
-        <el-table-column prop="createdAt" label="时间" width="160">
+        <el-table-column prop="createdAt" label="时间" min-width="120">
           <template #default="{ row }">
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column prop="type" label="类型" width="100">
+        <el-table-column prop="type" label="类型" min-width="80">
           <template #default="{ row }">
             <el-tag :type="row.type === 'RECHARGE' ? 'success' : 'danger'" size="small">
               {{ row.type === 'RECHARGE' ? '充值' : '扣减' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="amount" label="金额" width="120">
+        <el-table-column prop="amount" label="金额" min-width="100">
           <template #default="{ row }">
             <span :class="row.type === 'RECHARGE' ? 'recharge' : 'deduct'">
               {{ row.type === 'RECHARGE' ? '+' : '-' }}¥{{ formatNumber(row.amount) }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="operatorName" label="操作人" width="120" />
+        <el-table-column prop="operatorName" label="操作人" min-width="90" />
         <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
       </el-table>
       <el-pagination
@@ -329,24 +329,24 @@
         </el-button>
       </div>
       <el-table :data="vipLevels" stripe>
-        <el-table-column prop="level" label="等级" width="80" />
-        <el-table-column prop="name" label="名称" width="120" />
-        <el-table-column prop="discountRate" label="折扣" width="100">
+        <el-table-column prop="level" label="等级" min-width="70" />
+        <el-table-column prop="name" label="名称" min-width="100" />
+        <el-table-column prop="discountRate" label="折扣" min-width="80">
           <template #default="{ row }">
             {{ row.discountRate * 100 }}%
           </template>
         </el-table-column>
-        <el-table-column prop="upgradeConsumption" label="升级条件(消费)" width="150">
+        <el-table-column prop="upgradeConsumption" label="升级条件(消费)" min-width="130">
           <template #default="{ row }">
             {{ row.upgradeConsumption ? '¥' + formatNumber(row.upgradeConsumption) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="upgradeRecharge" label="升级条件(预存)" width="150">
+        <el-table-column prop="upgradeRecharge" label="升级条件(预存)" min-width="130">
           <template #default="{ row }">
             {{ row.upgradeRecharge ? '¥' + formatNumber(row.upgradeRecharge) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" min-width="140">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="handleEditVip(row)">编辑</el-button>
             <el-button
@@ -420,7 +420,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 import {
   User, Plus, Setting, Search, Money, List, Edit,
-  CircleClose, CircleCheck, Wallet, ShoppingCart, Delete
+  CircleClose, CircleCheck, Wallet, ShoppingCart, Delete,
+  Operation, ArrowDown
 } from '@element-plus/icons-vue'
 import {
   getBosses, createBoss, updateBoss, disableBoss, enableBoss, deleteBoss,
@@ -599,6 +600,19 @@ const showCreateDialog = () => {
   form.vipLevel = 0
   form.remark = ''
   dialogVisible.value = true
+}
+
+const handleBossAction = (cmd, row) => {
+  const actions = {
+    recharge: handleRecharge,
+    editBalance: handleEditBalance,
+    records: handleRecords,
+    edit: handleEdit,
+    disable: handleDisable,
+    enable: handleEnable,
+    delete: handleDelete
+  }
+  if (actions[cmd]) actions[cmd](row)
 }
 
 const handleEdit = (row) => {
@@ -839,18 +853,20 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .boss-page {
-  padding: 20px;
-  background: #f8f8fc;
+  padding: 0;
+  background: transparent;
   min-height: 100vh;
 }
 
 .boss-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
 
   :deep(.el-card__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
   }
 }
 
@@ -867,13 +883,13 @@ onMounted(() => {
 
   .title-icon {
     font-size: 24px;
-    color: #ff6b6b;
+    color: var(--primary-color);
   }
 
   .title-text {
     font-size: 20px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
   }
 }
 
@@ -904,20 +920,28 @@ onMounted(() => {
 .stat-card {
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 20px;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--border-radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s;
+  margin-bottom: 16px;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+  }
 
   .stat-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 28px;
+    font-size: 20px;
+    flex-shrink: 0;
   }
 
   .stat-content {
@@ -925,55 +949,66 @@ onMounted(() => {
   }
 
   .stat-label {
-    font-size: 13px;
-    color: #909399;
-    margin-bottom: 5px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 3px;
   }
 
   .stat-value {
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 700;
-    color: #303133;
+    color: var(--text-primary);
   }
 
   &.primary .stat-icon {
-    background: #fff5f5;
-    color: #ff6b6b;
+    background: var(--danger-bg);
+    color: var(--danger-dark);
   }
 
   &.success .stat-icon {
-    background: #fff8f0;
-    color: #f0c27f;
+    background: var(--warning-bg);
+    color: var(--warning-dark);
   }
 
   &.warning .stat-icon {
-    background: #fdf6ec;
-    color: #e6a23c;
+    background: var(--warning-bg);
+    color: var(--warning-dark);
   }
 
   &.info .stat-icon {
-    background: #f4f4f5;
-    color: #606266;
+    background: var(--primary-bg);
+    color: var(--primary-color);
   }
 }
 
 .boss-table {
-  :deep(th) {
-    background: #f8f8fc;
-    font-weight: 600;
-    color: #606266;
+  :deep(th.el-table__cell) {
+    background: #f8f9fa !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    font-size: 13px;
+    padding: 12px 8px;
+  }
+
+  :deep(td.el-table__cell) {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  :deep(tr:hover td.el-table__cell) {
+    background: rgba(108, 92, 231, 0.04) !important;
   }
 
   .boss-no {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-weight: 600;
-    color: #ff6b6b;
+    color: var(--primary-color);
     font-size: 13px;
   }
 
   .boss-name {
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
   }
 
   .contact-info {
@@ -982,22 +1017,22 @@ onMounted(() => {
     gap: 8px;
 
     .contact-value {
-      color: #606266;
+      color: var(--text-secondary);
       font-size: 13px;
     }
   }
 
   .balance {
     font-weight: 700;
-    color: #f0c27f;
+    color: var(--warning-dark);
 
     &.zero {
-      color: #909399;
+      color: var(--text-tertiary);
     }
   }
 
   .consumption {
-    color: #f56c6c;
+    color: var(--danger-dark);
     font-weight: 500;
   }
 
@@ -1014,24 +1049,12 @@ onMounted(() => {
 }
 
 .boss-dialog {
-  :deep(.el-dialog__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
-
-    .el-dialog__title {
-      font-weight: 600;
-    }
-  }
-
-  :deep(.el-dialog__body) {
-    padding: 25px 20px;
-  }
 }
 
 .recharge-info {
-  background: #f8f8fc;
+  background: #f8f9fa;
   padding: 15px;
-  border-radius: 8px;
+  border-radius: var(--border-radius);
   margin-bottom: 20px;
 
   .info-item {
@@ -1044,15 +1067,15 @@ onMounted(() => {
     }
 
     .label {
-      color: #909399;
+      color: var(--text-tertiary);
     }
 
     .value {
       font-weight: 600;
-      color: #303133;
+      color: var(--text-primary);
 
       &.highlight {
-        color: #f0c27f;
+        color: var(--warning-dark);
         font-size: 18px;
       }
     }
@@ -1065,28 +1088,28 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 15px;
   padding: 10px 15px;
-  background: #f8f8fc;
-  border-radius: 8px;
+  background: #f8f9fa;
+  border-radius: var(--border-radius);
 
   .boss-name {
     font-weight: 600;
     font-size: 16px;
-    color: #303133;
+    color: var(--text-primary);
   }
 
   .balance {
-    color: #f0c27f;
+    color: var(--warning-dark);
     font-weight: 600;
   }
 }
 
 .recharge {
-  color: #f0c27f;
+  color: var(--warning-dark);
   font-weight: 600;
 }
 
 .deduct {
-  color: #f56c6c;
+  color: var(--danger-dark);
   font-weight: 600;
 }
 
@@ -1096,7 +1119,97 @@ onMounted(() => {
 
 .form-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-tertiary);
   margin-top: 5px;
+}
+
+@media (max-width: 768px) {
+  .boss-card {
+    :deep(.el-card__header) {
+      padding: 12px 14px;
+    }
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .header-title {
+    .title-icon {
+      font-size: 20px;
+    }
+
+    .title-text {
+      font-size: 18px;
+    }
+  }
+
+  .filter-row {
+    flex-direction: column;
+    gap: 8px;
+
+    .filter-input,
+    .filter-select {
+      width: 100%;
+    }
+  }
+
+  .stat-card {
+    padding: 12px;
+    gap: 10px;
+
+    .stat-icon {
+      width: 36px;
+      height: 36px;
+      font-size: 16px;
+    }
+
+    .stat-value {
+      font-size: 16px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+    }
+  }
+
+  .boss-table {
+    min-width: 700px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-title {
+    .title-icon {
+      font-size: 18px;
+    }
+
+    .title-text {
+      font-size: 16px;
+    }
+  }
+
+  .stat-card {
+    padding: 10px;
+    gap: 8px;
+
+    .stat-icon {
+      width: 32px;
+      height: 32px;
+      font-size: 14px;
+    }
+
+    .stat-value {
+      font-size: 14px;
+    }
+  }
+
+  .boss-table {
+    min-width: 600px;
+    font-size: 11px;
+  }
 }
 </style>

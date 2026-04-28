@@ -595,12 +595,11 @@ watch(() => adminStats.value, () => {
 
 <style scoped lang="scss">
 .finance-page {
-  padding: 20px;
-  background: #f8f8fc;
+  padding: 0;
+  background: transparent;
   min-height: 100vh;
 }
 
-// 统计卡片样式
 .stats-row {
   margin-bottom: 20px;
 }
@@ -612,32 +611,33 @@ watch(() => adminStats.value, () => {
 .stat-card {
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 20px;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  transition: transform 0.2s, box-shadow 0.2s;
-  margin-bottom: 20px;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--border-radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s;
+  margin-bottom: 16px;
   
   &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
   }
   
   .stat-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 28px;
+    font-size: 22px;
+    flex-shrink: 0;
     
     &.large {
-      width: 60px;
-      height: 60px;
-      font-size: 32px;
+      width: 52px;
+      height: 52px;
+      font-size: 26px;
     }
   }
   
@@ -646,82 +646,83 @@ watch(() => adminStats.value, () => {
   }
   
   .stat-label {
-    font-size: 13px;
-    color: #909399;
-    margin-bottom: 5px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
   }
   
   .stat-value {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
-    color: #303133;
+    color: var(--text-primary);
     
     &.large {
-      font-size: 28px;
+      font-size: 24px;
     }
   }
   
   .stat-sub {
     font-size: 12px;
-    color: #c0c4cc;
-    margin-top: 3px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
   }
   
   &.primary .stat-icon {
-    background: #fff5f5;
-    color: #ff6b6b;
+    background: var(--danger-bg);
+    color: var(--danger-dark);
   }
   
   &.info .stat-icon {
     background: #f4f4f5;
-    color: #606266;
+    color: var(--text-secondary);
   }
   
   &.success .stat-icon {
-    background: #fff8f0;
-    color: #f0c27f;
+    background: var(--warning-bg);
+    color: var(--warning-dark);
   }
   
   &.warning .stat-icon {
-    background: #fdf6ec;
-    color: #e6a23c;
+    background: var(--warning-bg);
+    color: var(--warning-dark);
   }
   
   &.danger .stat-icon {
-    background: #fef0f0;
-    color: #f56c6c;
+    background: var(--danger-bg);
+    color: var(--danger-dark);
   }
   
   &.purple .stat-icon {
-    background: #f5f0ff;
-    color: #9254de;
+    background: var(--primary-bg);
+    color: var(--primary-color);
   }
   
   &.cancelled .stat-icon {
-    background: #fef0f0;
-    color: #f56c6c;
+    background: var(--danger-bg);
+    color: var(--danger-dark);
   }
 }
 
-// 图表区域
 .charts-row {
   margin-bottom: 20px;
 }
 
 .chart-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
   
   :deep(.el-card__header) {
-    padding: 15px 20px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
     
     .card-header {
       display: flex;
       align-items: center;
       gap: 8px;
       font-weight: 600;
-      color: #303133;
+      color: var(--text-primary);
     }
   }
 }
@@ -730,22 +731,23 @@ watch(() => adminStats.value, () => {
   height: 320px;
 }
 
-// 排行卡片
 .ranking-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
   margin-bottom: 20px;
   
   :deep(.el-card__header) {
-    padding: 15px 20px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
     
     .card-header {
       display: flex;
       align-items: center;
       gap: 8px;
       font-weight: 600;
-      color: #303133;
+      color: var(--text-primary);
     }
   }
 }
@@ -756,12 +758,12 @@ watch(() => adminStats.value, () => {
   gap: 15px;
   padding: 12px 15px;
   margin-bottom: 10px;
-  background: #f5f7fa;
-  border-radius: 8px;
-  transition: background 0.2s;
+  background: #f8f9fa;
+  border-radius: var(--border-radius);
+  transition: all 0.2s;
   
   &:hover {
-    background: #fff5f5;
+    background: var(--primary-bg);
   }
   
   &.top3 {
@@ -773,7 +775,7 @@ watch(() => adminStats.value, () => {
     height: 32px;
     border-radius: 50%;
     background: #dcdfe6;
-    color: #606266;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -794,7 +796,7 @@ watch(() => adminStats.value, () => {
   
   .rank-name {
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
     margin-bottom: 6px;
   }
   
@@ -807,35 +809,36 @@ watch(() => adminStats.value, () => {
   
   .rank-bar {
     height: 100%;
-    background: linear-gradient(90deg, #ff6b6b 0%, #f0c27f 100%);
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--primary-light) 100%);
     border-radius: 3px;
     transition: width 0.5s ease;
   }
   
   .rank-income {
     font-weight: 700;
-    color: #f0c27f;
+    color: var(--warning-dark);
     font-size: 15px;
     white-space: nowrap;
   }
 }
 
-// 提现卡片
 .withdraw-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
   margin-bottom: 20px;
   
   :deep(.el-card__header) {
-    padding: 15px 20px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
     
     .card-header {
       display: flex;
       align-items: center;
       gap: 8px;
       font-weight: 600;
-      color: #303133;
+      color: var(--text-primary);
     }
   }
 }
@@ -845,7 +848,7 @@ watch(() => adminStats.value, () => {
   
   .balance-tip {
     font-size: 12px;
-    color: #f56c6c;
+    color: var(--danger-dark);
     margin-top: 5px;
   }
   
@@ -855,14 +858,15 @@ watch(() => adminStats.value, () => {
   }
 }
 
-// 记录卡片
 .records-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
   
   :deep(.el-card__header) {
-    padding: 15px 20px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
     
     .card-header {
       display: flex;
@@ -874,54 +878,66 @@ watch(() => adminStats.value, () => {
         align-items: center;
         gap: 8px;
         font-weight: 600;
-        color: #303133;
+        color: var(--text-primary);
       }
     }
   }
 }
 
 .records-table {
-  :deep(th) {
-    background: #f8f8fc;
-    font-weight: 600;
-    color: #606266;
+  :deep(th.el-table__cell) {
+    background: #f8f9fa !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    font-size: 13px;
+    padding: 12px 8px;
+  }
+  
+  :deep(td.el-table__cell) {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  :deep(tr:hover td.el-table__cell) {
+    background: rgba(108, 92, 231, 0.04) !important;
   }
   
   .player-name {
     font-weight: 500;
-    color: #303133;
+    color: var(--text-primary);
   }
   
   .time-cell {
-    color: #606266;
+    color: var(--text-secondary);
     font-size: 13px;
   }
   
   .amount-cell {
+    font-family: var(--font-mono);
     font-weight: 700;
     font-size: 15px;
     
     &.income {
-      color: #f0c27f;
+      color: var(--success-color);
     }
     
     &.expense {
-      color: #f56c6c;
+      color: var(--danger-dark);
     }
   }
   
   .order-link {
-    font-family: monospace;
-    color: #ff6b6b;
+    font-family: var(--font-mono);
+    color: var(--primary-color);
     font-weight: 500;
   }
   
   .no-order {
-    color: #c0c4cc;
+    color: var(--text-tertiary);
   }
   
   .description-cell {
-    color: #606266;
+    color: var(--text-secondary);
     font-size: 13px;
   }
 }
@@ -933,38 +949,34 @@ watch(() => adminStats.value, () => {
 
 .expand-content {
   padding: 16px 20px;
-  background: #fafbfc;
+  background: #f8f9fa;
+  border-radius: var(--border-radius);
 }
 
-// 暂不开放页面样式
 .not-available-page {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 60vh;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
   margin-bottom: 20px;
   
   .not-available-icon {
     font-size: 80px;
-    color: #c0c4cc;
+    color: var(--text-tertiary);
     margin-bottom: 20px;
   }
   
   .not-available-text {
-    color: #909399;
+    color: var(--text-secondary);
     font-size: 14px;
     margin-top: 10px;
   }
 }
 
 @media (max-width: 768px) {
-  .finance-page {
-    padding: 10px;
-  }
-
   .stats-row,
   .player-stats-row {
     gap: 8px;
@@ -976,18 +988,18 @@ watch(() => adminStats.value, () => {
     gap: 10px;
 
     .stat-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      font-size: 20px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      font-size: 18px;
     }
 
     .stat-value {
-      font-size: 20px;
+      font-size: 18px;
     }
 
     .stat-label {
-      font-size: 12px;
+      font-size: 11px;
     }
   }
 
@@ -1083,23 +1095,19 @@ watch(() => adminStats.value, () => {
 }
 
 @media (max-width: 480px) {
-  .finance-page {
-    padding: 8px;
-  }
-
   .stat-card {
     padding: 10px;
     gap: 8px;
 
     .stat-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      font-size: 18px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      font-size: 16px;
     }
 
     .stat-value {
-      font-size: 18px;
+      font-size: 16px;
     }
 
     .stat-label {

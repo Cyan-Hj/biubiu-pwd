@@ -196,14 +196,39 @@ onMounted(() => {
 
 .reviewed-info {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-secondary);
+}
+
+.withdrawals-page :deep(.el-card) {
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
+}
+
+.withdrawals-page :deep(.el-card__header) {
+  padding: 14px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
+}
+
+.withdrawals-page :deep(th.el-table__cell) {
+  background: #f8f9fa !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+  font-size: 13px;
+  padding: 12px 8px;
+}
+
+.withdrawals-page :deep(td.el-table__cell) {
+  padding: 10px 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.withdrawals-page :deep(tr:hover td.el-table__cell) {
+  background: rgba(108, 92, 231, 0.04) !important;
 }
 
 @media (max-width: 768px) {
-  .withdrawals-page {
-    padding: 10px;
-  }
-
   .card-header {
     flex-direction: column;
     align-items: stretch;
@@ -240,10 +265,6 @@ onMounted(() => {
 }
 
 @media (max-width: 480px) {
-  .withdrawals-page {
-    padding: 8px;
-  }
-
   .card-header {
     gap: 8px;
   }

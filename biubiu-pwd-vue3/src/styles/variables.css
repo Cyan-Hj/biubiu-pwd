@@ -1,0 +1,42 @@
+:root {
+  --primary-color: #6c5ce7;
+  --primary-light: #a29bfe;
+  --primary-dark: #5649c0;
+  --primary-bg: rgba(108, 92, 231, 0.08);
+  --primary-bg-hover: rgba(108, 92, 231, 0.12);
+
+  --success-color: #00b894;
+  --success-light: #55efc4;
+  --success-bg: rgba(0, 184, 148, 0.08);
+
+  --warning-color: #fdcb6e;
+  --warning-dark: #e6a23c;
+  --warning-bg: rgba(253, 203, 110, 0.08);
+
+  --danger-color: #ff7675;
+  --danger-dark: #f56c6c;
+  --danger-bg: rgba(255, 118, 117, 0.08);
+
+  --info-color: #74b9ff;
+  --info-dark: #409eff;
+  --info-bg: rgba(116, 185, 255, 0.08);
+
+  --text-primary: #2d3436;
+  --text-secondary: #636e72;
+  --text-tertiary: #b2bec3;
+
+  --bg-body: #f5f6fa;
+  --bg-card: #ffffff;
+  --bg-sidebar: #2d3436;
+  --bg-sidebar-active: rgba(108, 92, 231, 0.15);
+
+  --border-radius: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-sm: 6px;
+
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-dropdown: 0 4px 16px rgba(0, 0, 0, 0.12);
+
+  --font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}

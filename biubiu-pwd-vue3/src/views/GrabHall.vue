@@ -14,38 +14,44 @@
             <el-icon class="title-icon"><Tickets /></el-icon>
             <span class="title-text">抢单大厅</span>
           </div>
-          <div class="header-actions">
-            <el-button @click="loadOrders" :loading="loading">
-              <el-icon><Refresh /></el-icon>刷新
-            </el-button>
-          </div>
+          <el-button circle class="refresh-btn" @click="loadOrders" :loading="loading">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
         </div>
       </template>
 
-      <div class="filter-row">
-        <el-radio-group v-model="filterType" @change="handleFilterChange" class="filter-group">
-          <el-radio-button label="">全部</el-radio-button>
-          <el-radio-button label="SINGLE">单人单</el-radio-button>
-          <el-radio-button label="DOUBLE">双人单</el-radio-button>
-        </el-radio-group>
-        <el-radio-group v-model="filterOrderType" @change="handleFilterChange" class="filter-group">
-          <el-radio-button label="">全部类型</el-radio-button>
-          <el-radio-button label="peiwand">陪玩单</el-radio-button>
-          <el-radio-button label="huhang">护航单</el-radio-button>
-        </el-radio-group>
+      <!-- 筛选标签 - 移动端横向滚动 -->
+      <div class="filter-scroll-wrapper">
+        <div class="filter-row">
+          <el-radio-group v-model="filterType" @change="handleFilterChange" class="filter-group">
+            <el-radio-button label="">全部</el-radio-button>
+            <el-radio-button label="SINGLE">单人单</el-radio-button>
+            <el-radio-button label="DOUBLE">双人单</el-radio-button>
+          </el-radio-group>
+          <el-radio-group v-model="filterOrderType" @change="handleFilterChange" class="filter-group">
+            <el-radio-button label="">全部类型</el-radio-button>
+            <el-radio-button label="peiwand">陪玩单</el-radio-button>
+            <el-radio-button label="huhang">护航单</el-radio-button>
+          </el-radio-group>
+        </div>
       </div>
 
       <div v-loading="loading" class="order-list">
-        <el-empty v-if="orders.length === 0 && !loading" description="暂无可抢订单" />
+        <!-- 空状态优化 -->
+        <div v-if="orders.length === 0 && !loading" class="empty-state">
+          <el-icon class="empty-state-icon"><Tickets /></el-icon>
+          <div class="empty-state-title">暂无可抢订单</div>
+          <div class="empty-state-desc">休息一下，新订单会实时显示在这里</div>
+        </div>
 
         <div v-for="order in orders" :key="order.id" class="order-card-item">
           <div class="order-header">
             <div class="order-info">
               <span class="order-no">{{ order.orderNo }}</span>
-              <el-tag :type="order.orderType === 'huhang' ? 'danger' : 'primary'" size="small">
+              <el-tag :type="order.orderType === 'huhang' ? 'danger' : 'primary'" size="small" effect="light">
                 {{ order.orderType === 'huhang' ? '护航单' : '陪玩单' }}
               </el-tag>
-              <el-tag :type="order.playerCount === 'DOUBLE' ? 'warning' : 'success'" size="small">
+              <el-tag :type="order.playerCount === 'DOUBLE' ? 'warning' : 'success'" size="small" effect="light">
                 {{ order.playerCount === 'DOUBLE' ? '双人' : '单人' }}
               </el-tag>
               <el-tag v-if="order.priorityLevel" type="danger" size="small" effect="dark">
@@ -507,8 +513,15 @@ onUnmounted(() => {
 }
 
 .hall-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
+
+  :deep(.el-card__header) {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
+  }
 }
 
 .hall-disabled {
@@ -525,20 +538,20 @@ onUnmounted(() => {
 
 .disabled-icon {
   font-size: 64px;
-  color: #e6a23c;
+  color: var(--warning-dark);
   margin-bottom: 20px;
 }
 
 .disabled-title {
   font-size: 22px;
-  color: #303133;
+  color: var(--text-primary);
   margin: 0 0 12px 0;
   font-weight: 600;
 }
 
 .disabled-desc {
   font-size: 14px;
-  color: #909399;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -555,25 +568,75 @@ onUnmounted(() => {
 
   .title-icon {
     font-size: 24px;
-    color: #667eea;
+    color: var(--primary-color);
   }
 
   .title-text {
     font-size: 20px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
+  }
+}
+
+.refresh-btn {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  color: var(--primary-color);
+  border-color: var(--primary-light);
+}
+
+/* 筛选标签横向滚动 */
+.filter-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 16px;
+  padding-bottom: 4px;
+
+  &::-webkit-scrollbar {
+    display: none;
   }
 }
 
 .filter-row {
   display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
+  gap: 12px;
+  flex-wrap: nowrap;
+  width: max-content;
+  min-width: 100%;
+}
 
-  .filter-group {
-    flex-wrap: wrap;
-  }
+.filter-group {
+  flex-shrink: 0;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 80px;
+  color: var(--text-tertiary);
+  margin-bottom: 20px;
+  opacity: 0.4;
+}
+
+.empty-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.empty-state-desc {
+  font-size: 14px;
+  color: var(--text-tertiary);
 }
 
 .order-list {
@@ -581,16 +644,16 @@ onUnmounted(() => {
 }
 
 .order-card-item {
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid #f0f0f0;
+  border-radius: var(--border-radius);
   padding: 16px 20px;
   margin-bottom: 12px;
   transition: all 0.3s;
 
   &:hover {
-    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.12);
-    border-color: rgba(102, 126, 234, 0.3);
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--primary-light);
   }
 }
 
@@ -599,16 +662,20 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
 
   .order-info {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 
     .order-no {
       font-weight: 600;
-      color: #303133;
+      color: var(--text-primary);
       font-size: 15px;
+      font-family: var(--font-mono);
     }
   }
 
@@ -618,12 +685,12 @@ onUnmounted(() => {
     .price {
       font-size: 18px;
       font-weight: 700;
-      color: #667eea;
+      color: var(--primary-color);
     }
 
     .total {
       font-size: 13px;
-      color: #909399;
+      color: var(--text-secondary);
       margin-left: 8px;
     }
   }
@@ -633,21 +700,21 @@ onUnmounted(() => {
   .order-detail {
     display: flex;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 12px;
     margin-bottom: 10px;
 
     .detail-item {
       font-size: 14px;
 
       .label {
-        color: #909399;
+        color: var(--text-tertiary);
       }
 
       .value {
-        color: #606266;
+        color: var(--text-secondary);
 
         &.income {
-          color: #e6a23c;
+          color: var(--warning-dark);
           font-weight: 600;
         }
       }
@@ -656,12 +723,12 @@ onUnmounted(() => {
 }
 
 .priority-waiting-info {
-  background: #fdf6ec;
+  background: var(--warning-bg);
   border: 1px solid #faecd8;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 8px 12px;
   margin-bottom: 10px;
-  color: #e6a23c;
+  color: var(--warning-dark);
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -671,10 +738,10 @@ onUnmounted(() => {
 .locked-info {
   background: #f4f4f5;
   border: 1px solid #e9e9eb;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 8px 12px;
   margin-bottom: 10px;
-  color: #909399;
+  color: var(--text-secondary);
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -682,22 +749,22 @@ onUnmounted(() => {
 }
 
 .waiting-players {
-  background: #f0f9eb;
+  background: var(--success-bg);
   border: 1px solid #e1f3d8;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 10px 12px;
   margin-bottom: 10px;
 
   .waiting-title {
     font-size: 13px;
-    color: #67c23a;
+    color: var(--success-color);
     font-weight: 600;
     margin-bottom: 6px;
   }
 
   .waiting-player {
     font-size: 13px;
-    color: #606266;
+    color: var(--text-secondary);
     margin-bottom: 4px;
 
     .wp-name {
@@ -705,12 +772,12 @@ onUnmounted(() => {
     }
 
     .wp-level {
-      color: #909399;
+      color: var(--text-tertiary);
       margin: 0 4px;
     }
 
     .wp-price {
-      color: #e6a23c;
+      color: var(--warning-dark);
     }
   }
 }
@@ -723,7 +790,7 @@ onUnmounted(() => {
 
   .no-team-tip {
     font-size: 12px;
-    color: #e6a23c;
+    color: var(--warning-dark);
   }
 }
 
@@ -740,11 +807,11 @@ onUnmounted(() => {
       font-size: 14px;
 
       .label {
-        color: #909399;
+        color: var(--text-tertiary);
       }
 
       .income {
-        color: #e6a23c;
+        color: var(--warning-dark);
         font-weight: 600;
       }
     }
@@ -753,12 +820,12 @@ onUnmounted(() => {
   .team-grab-input {
     margin-top: 16px;
     padding-top: 16px;
-    border-top: 1px solid #ebeef5;
+    border-top: 1px solid #f0f0f0;
   }
 
   .team-grab-tip {
     font-size: 12px;
-    color: #909399;
+    color: var(--text-tertiary);
     margin-top: 8px;
   }
 }
@@ -775,7 +842,7 @@ onUnmounted(() => {
 
   .partner-info {
     font-size: 12px;
-    color: #909399;
+    color: var(--text-tertiary);
   }
 }
 
@@ -787,11 +854,11 @@ onUnmounted(() => {
 }
 
 .status-warning {
-  background: #fdf6ec;
+  background: var(--warning-bg);
   border: 1px solid #faecd8;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 10px;
-  color: #e6a23c;
+  color: var(--warning-dark);
   margin-bottom: 16px;
   display: flex;
   align-items: center;
@@ -802,47 +869,175 @@ onUnmounted(() => {
   margin-bottom: 20px;
   padding: 12px;
   background: #f8f8fc;
-  border-radius: 8px;
+  border-radius: var(--border-radius);
 
   h4 {
     margin: 0 0 8px 0;
-    color: #303133;
+    color: var(--text-primary);
     font-size: 15px;
   }
 
   p {
     margin: 4px 0;
     font-size: 14px;
-    color: #606266;
+    color: var(--text-secondary);
   }
 }
 
 .other-waiter {
   font-size: 13px;
-  color: #606266;
+  color: var(--text-secondary);
   margin: 2px 0;
 }
 
 .cooldown-item {
   font-size: 13px;
-  color: #f56c6c;
+  color: var(--danger-dark);
   margin: 4px 0;
 }
 
+/* 移动端适配 */
 @media (max-width: 768px) {
+  .hall-card {
+    :deep(.el-card__header) {
+      padding: 12px 14px;
+    }
+  }
+
+  .header-title {
+    .title-icon {
+      font-size: 20px;
+    }
+
+    .title-text {
+      font-size: 17px;
+    }
+  }
+
+  .refresh-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .filter-scroll-wrapper {
+    margin-bottom: 12px;
+  }
+
+  .filter-row {
+    gap: 8px;
+  }
+
+  .filter-group {
+    :deep(.el-radio-button__inner) {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+  }
+
+  .empty-state {
+    padding: 60px 16px;
+  }
+
+  .empty-state-icon {
+    font-size: 60px;
+  }
+
+  .empty-state-title {
+    font-size: 16px;
+  }
+
+  .empty-state-desc {
+    font-size: 13px;
+  }
+
   .order-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+
+    .order-price {
+      text-align: left;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
   }
 
   .order-body .order-detail {
     flex-direction: column;
     gap: 6px;
+
+    .detail-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .label {
+        font-size: 13px;
+      }
+
+      .value {
+        font-size: 13px;
+        text-align: right;
+        max-width: 60%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
   }
 
-  .filter-row {
-    flex-direction: column;
+  .order-card-item {
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+
+  .order-actions {
+    .el-button {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .order-header {
+    .order-info {
+      .order-no {
+        font-size: 14px;
+      }
+    }
+
+    .order-price {
+      .price {
+        font-size: 16px;
+      }
+
+      .total {
+        font-size: 12px;
+      }
+    }
+  }
+
+  .order-body .order-detail {
+    .detail-item {
+      .label {
+        font-size: 12px;
+      }
+
+      .value {
+        font-size: 12px;
+      }
+    }
+  }
+
+  .order-actions {
+    .el-button {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
   }
 }
 </style>
