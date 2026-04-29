@@ -262,7 +262,7 @@ public class OrderController {
     }
 
     @GetMapping("/pending-audit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<AuditOrderResponse>> getPendingAuditOrders() {
         List<Order> orders = orderRepository.findByStatusAndAuditStatus(Order.Status.COMPLETED, 0);
         List<AuditOrderResponse> list = orders.stream()
@@ -272,7 +272,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/audit-pass")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> auditPassOrder(@PathVariable Long id) {
         User currentUser = getCurrentUser();
         orderService.auditOrder(id, currentUser);
@@ -280,7 +280,7 @@ public class OrderController {
     }
 
     @PostMapping("/batch-audit-pass")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Integer> batchAuditPassOrders(@RequestBody List<Long> ids) {
         User currentUser = getCurrentUser();
         int count = 0;

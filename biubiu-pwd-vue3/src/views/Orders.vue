@@ -39,10 +39,10 @@
               <el-radio-button :label="6">
                 <el-icon><VideoPause /></el-icon>暂存
               </el-radio-button>
-              <el-radio-button label="pending_audit">
+              <el-radio-button v-if="isAdmin" label="pending_audit">
                 <el-icon><CircleCheck /></el-icon>待审核
               </el-radio-button>
-              <el-radio-button label="audited">
+              <el-radio-button v-if="isAdmin" label="audited">
                 <el-icon><CircleCheck /></el-icon>已审核
               </el-radio-button>
               <el-radio-button :label="5">
@@ -129,14 +129,14 @@
               <div class="stat-value">{{ orderStats.paused }}</div>
             </div>
           </div>
-          <div class="stat-card completed">
+          <div v-if="isAdmin" class="stat-card completed">
             <div class="stat-icon"><el-icon><CircleCheck /></el-icon></div>
             <div class="stat-info">
               <div class="stat-label">待审核</div>
               <div class="stat-value">{{ orderStats.pendingAudit }}</div>
             </div>
           </div>
-          <div class="stat-card audited">
+          <div v-if="isAdmin" class="stat-card audited">
             <div class="stat-icon"><el-icon><CircleCheck /></el-icon></div>
             <div class="stat-info">
               <div class="stat-label">已审核</div>
@@ -376,7 +376,7 @@
                       <el-dropdown-item v-if="(isAdmin || isCustomerService) && (row.status === 0 || row.status === 3)" command="pause"><el-icon><VideoPause /></el-icon>暂存</el-dropdown-item>
                       <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.status === 6" command="resume"><el-icon><RefreshRight /></el-icon>恢复</el-dropdown-item>
                       <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.status !== 4 && row.status !== 5" command="cancel" divided><el-icon><CircleClose /></el-icon>取消</el-dropdown-item>
-                      <el-dropdown-item v-if="(isAdmin || isCustomerService) && row.status === 4 && row.auditStatus !== 1" command="audit"><el-icon><CircleCheck /></el-icon>审核通过</el-dropdown-item>
+                      <el-dropdown-item v-if="isAdmin && row.status === 4 && row.auditStatus !== 1" command="audit"><el-icon><CircleCheck /></el-icon>审核通过</el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
