@@ -195,7 +195,6 @@
           <el-form-item label="收款方式">
             <el-radio-group v-model="withdrawForm.paymentMethod">
               <el-radio-button label="alipay">支付宝</el-radio-button>
-              <el-radio-button label="wechat">微信</el-radio-button>
               <el-radio-button label="bank">银行卡</el-radio-button>
             </el-radio-group>
           </el-form-item>
@@ -204,6 +203,9 @@
           </el-form-item>
           <el-form-item label="真实姓名">
             <el-input v-model="withdrawForm.realName" placeholder="请输入真实姓名" />
+          </el-form-item>
+          <el-form-item label="身份证号">
+            <el-input v-model="withdrawForm.idCard" placeholder="请输入身份证号" maxlength="18" />
           </el-form-item>
           <el-form-item v-if="withdrawForm.paymentMethod === 'bank'" label="所在银行">
             <el-input v-model="withdrawForm.bankName" placeholder="请输入所在银行，如：中国工商银行" />
@@ -246,13 +248,14 @@
         <el-table-column prop="recordType" label="类型" width="90">
           <template #default="{ row }">
             <el-tag v-if="row.recordType === 'income'" type="success" effect="light" size="small">收入</el-tag>
+            <el-tag v-else-if="row.recordType === 'withdrawal' && row.description && row.description.includes('被拒绝')" type="warning" effect="light" size="small">退回</el-tag>
             <el-tag v-else-if="row.recordType === 'withdrawal'" type="danger" effect="light" size="small">提现</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="amount" label="金额" width="130">
           <template #default="{ row }">
-            <span class="amount-cell" :class="{ 'income': row.recordType === 'income', 'expense': row.recordType === 'withdrawal' }">
-              {{ row.recordType === 'income' ? '+' : row.recordType === 'withdrawal' ? '-' : '' }}¥{{ formatNumber(row.amount) }}
+            <span class="amount-cell" :class="{ 'income': row.recordType === 'income' || (row.recordType === 'withdrawal' && row.description && row.description.includes('被拒绝')), 'expense': row.recordType === 'withdrawal' && !(row.description && row.description.includes('被拒绝')) }">
+              {{ row.recordType === 'income' || (row.recordType === 'withdrawal' && row.description && row.description.includes('被拒绝')) ? '+' : row.recordType === 'withdrawal' ? '-' : '' }}¥{{ formatNumber(row.amount) }}
             </span>
           </template>
         </el-table-column>
@@ -264,7 +267,8 @@
         </el-table-column>
         <el-table-column prop="description" label="说明" min-width="200">
           <template #default="{ row }">
-            <div class="description-cell">{{ row.description || '-' }}</div>
+            <div v-if="row.recordType === 'withdrawal' && row.description && row.description.includes('被拒绝')" class="description-cell" style="color: #e6a23c;">{{ row.description }}</div>
+            <div v-else class="description-cell">{{ row.description || '-' }}</div>
           </template>
         </el-table-column>
       </el-table>
@@ -331,15 +335,20 @@ const withdrawForm = reactive({
   paymentMethod: 'alipay',
   accountInfo: '',
   realName: '',
+  idCard: '',
   bankName: ''
 })
 
 const canWithdraw = computed(() => {
-  return incomeData.value.availableBalance > 0 && 
+  const baseValid = incomeData.value.availableBalance > 0 && 
          withdrawForm.amount > 0 && 
          withdrawForm.amount <= incomeData.value.availableBalance &&
          withdrawForm.accountInfo && 
          withdrawForm.realName
+  if (withdrawForm.paymentMethod === 'bank') {
+    return baseValid && !!withdrawForm.bankName
+  }
+  return baseValid
 })
 
 const averageOrderValue = computed(() => {
@@ -567,6 +576,7 @@ const handleWithdraw = async () => {
     withdrawForm.amount = 100
     withdrawForm.accountInfo = ''
     withdrawForm.realName = ''
+    withdrawForm.idCard = ''
     withdrawForm.bankName = ''
   } catch (error) {
     ElMessage.error('提现申请失败')

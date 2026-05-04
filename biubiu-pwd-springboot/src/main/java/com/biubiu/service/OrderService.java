@@ -760,6 +760,34 @@ public class OrderService {
             }
         }
 
+        if (order.getBoss() != null && Boolean.TRUE.equals(order.getUseBalance())) {
+            BigDecimal alreadyDeducted = order.getBalanceDeducted() != null ? order.getBalanceDeducted() : BigDecimal.ZERO;
+            if (actualTotalAmount.compareTo(alreadyDeducted) != 0) {
+                BigDecimal difference = actualTotalAmount.subtract(alreadyDeducted);
+                Boss boss = order.getBoss();
+
+                boss.setBalance(boss.getBalance().subtract(difference));
+                bossRepository.save(boss);
+
+                order.setBalanceDeducted(actualTotalAmount);
+
+                com.biubiu.entity.BossRechargeRecord adjustRecord = new com.biubiu.entity.BossRechargeRecord();
+                adjustRecord.setBossId(boss.getId());
+                adjustRecord.setOrderNo(order.getOrderNo());
+                adjustRecord.setOperatorId(auditor.getId());
+                if (difference.compareTo(BigDecimal.ZERO) > 0) {
+                    adjustRecord.setAmount(difference.negate());
+                    adjustRecord.setType(com.biubiu.entity.BossRechargeRecord.Type.DEDUCT);
+                    adjustRecord.setRemark("审核订单，补扣实际金额差额¥" + difference);
+                } else {
+                    adjustRecord.setAmount(difference.abs());
+                    adjustRecord.setType(com.biubiu.entity.BossRechargeRecord.Type.REFUND);
+                    adjustRecord.setRemark("审核订单，退还多扣金额¥" + difference.abs());
+                }
+                rechargeRecordRepository.save(adjustRecord);
+            }
+        }
+
         order.setActualIncomeAmount(totalPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
         order.setAuditStatus(1);
         order.setAuditedBy(auditor);
@@ -917,11 +945,7 @@ public class OrderService {
             throw new RuntimeException("已取消的订单无法修改");
         }
 
-        boolean needBalanceRecalc = false;
-        BigDecimal oldTotalAmount = order.getTotalAmount();
-        BigDecimal oldBalanceDeducted = order.getBalanceDeducted();
         BigDecimal oldActualTotalAmount = order.getActualTotalAmount();
-        Boss oldBoss = order.getBoss();
 
         if (request.getBossInfo() != null) {
             order.setBossInfo(request.getBossInfo());
@@ -937,7 +961,6 @@ public class OrderService {
         }
         if (request.getTotalAmount() != null) {
             order.setTotalAmount(request.getTotalAmount());
-            needBalanceRecalc = true;
         }
         if (request.getActualHours() != null) {
             order.setActualHours(request.getActualHours());
@@ -966,30 +989,10 @@ public class OrderService {
                     .orElseThrow(() -> new RuntimeException("老板不存在"));
             order.setBoss(newBoss);
             order.setCustomerType(Order.CustomerType.REGULAR);
-            needBalanceRecalc = true;
         }
 
-        boolean useBalance = Boolean.TRUE.equals(request.getUseBalance());
-        order.setUseBalance(useBalance);
-
-        if (needBalanceRecalc && oldBoss != null && oldBalanceDeducted != null && oldBalanceDeducted.compareTo(BigDecimal.ZERO) > 0) {
-            oldBoss.setBalance(oldBoss.getBalance().add(oldBalanceDeducted));
-            bossRepository.save(oldBoss);
-
-            com.biubiu.entity.BossRechargeRecord refundRecord = new com.biubiu.entity.BossRechargeRecord();
-            refundRecord.setBossId(oldBoss.getId());
-            refundRecord.setAmount(oldBalanceDeducted);
-            refundRecord.setType(com.biubiu.entity.BossRechargeRecord.Type.REFUND);
-            refundRecord.setOrderNo(order.getOrderNo());
-            refundRecord.setRemark("修改订单，退还原扣款¥" + oldBalanceDeducted);
-            refundRecord.setOperatorId(currentUser.getId());
-            rechargeRecordRepository.save(refundRecord);
-
-            order.setBalanceDeducted(null);
-        }
-
-        if (useBalance && order.getBoss() != null && needBalanceRecalc) {
-            orderBalanceService.deductBalance(order, order.getBoss(), order.getTotalAmount());
+        if (request.getUseBalance() != null) {
+            order.setUseBalance(request.getUseBalance());
         }
 
         // 同步更新已完成订单的财务记录和陪玩师收入

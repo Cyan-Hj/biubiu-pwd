@@ -31,6 +31,9 @@ public class WithdrawalRequest {
     @Column(nullable = false, length = 50)
     private String realName;
 
+    @Column(length = 20)
+    private String idCard;
+
     @Column(length = 50)
     private String bankName;
 

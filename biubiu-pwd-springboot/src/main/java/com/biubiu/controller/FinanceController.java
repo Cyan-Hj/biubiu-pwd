@@ -409,6 +409,13 @@ public class FinanceController {
             User player = withdrawal.getPlayer();
             player.setAvailableBalance(player.getAvailableBalance().add(withdrawal.getAmount()));
             userRepository.save(player);
+
+            FinancialRecord record = new FinancialRecord();
+            record.setPlayer(player);
+            record.setRecordType(FinancialRecord.Type.withdrawal);
+            record.setAmount(withdrawal.getAmount());
+            record.setDescription("提现被拒绝：" + (request.getRejectReason() != null ? request.getRejectReason() : "无") + "，金额已退回");
+            financialRecordRepository.save(record);
         }
 
         if (request.getStatus() == WithdrawalRequest.Status.approved) {
@@ -456,6 +463,7 @@ public class FinanceController {
                 .paymentMethod(withdrawal.getPaymentMethod())
                 .accountInfo(withdrawal.getAccountInfo())
                 .realName(withdrawal.getRealName())
+                .idCard(withdrawal.getIdCard())
                 .bankName(withdrawal.getBankName())
                 .status(withdrawal.getStatus())
                 .rejectReason(withdrawal.getRejectReason())

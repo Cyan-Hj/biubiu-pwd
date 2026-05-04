@@ -22,5 +22,7 @@ public class WithdrawRequest {
     @NotBlank(message = "真实姓名不能为空")
     private String realName;
 
+    private String idCard;
+
     private String bankName;
 }
