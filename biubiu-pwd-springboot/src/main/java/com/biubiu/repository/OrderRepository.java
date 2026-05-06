@@ -1,9 +1,11 @@
 package com.biubiu.repository;
 
 import com.biubiu.entity.Order;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -31,6 +33,27 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                           @Param("excludeCancelled") Boolean excludeCancelled,
                           @Param("cancelledStatus") Order.Status cancelledStatus,
                           Pageable pageable);
+
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN o.boss b WHERE " +
+           "(:keyword IS NULL OR LOWER(o.orderNo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(o.bossInfo) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(o.serviceContent) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "(b IS NOT NULL AND LOWER(b.name) LIKE LOWER(CONCAT('%', :keyword, '%')))) AND " +
+           "(:status IS NULL OR o.status = :status) AND " +
+           "(:playerId IS NULL OR o.currentPlayer.id = :playerId OR o.currentPlayer2.id = :playerId) AND " +
+           "(:today IS NULL OR :today = false OR DATE(o.createdAt) = CURRENT_DATE) AND " +
+           "(:startDate IS NULL OR DATE(o.createdAt) >= :startDate) AND " +
+           "(:endDate IS NULL OR DATE(o.createdAt) <= :endDate) AND " +
+           "(:excludeCancelled IS NULL OR :excludeCancelled = false OR o.status <> :cancelledStatus)")
+    Page<Order> searchOrders(@Param("keyword") String keyword,
+                            @Param("status") Order.Status status,
+                            @Param("playerId") Long playerId,
+                            @Param("today") Boolean today,
+                            @Param("startDate") java.time.LocalDate startDate,
+                            @Param("endDate") java.time.LocalDate endDate,
+                            @Param("excludeCancelled") Boolean excludeCancelled,
+                            @Param("cancelledStatus") Order.Status cancelledStatus,
+                            Pageable pageable);
 
     @Query("SELECT o FROM Order o WHERE (o.currentPlayer.id = :playerId OR o.currentPlayer2.id = :playerId) ORDER BY o.createdAt DESC")
     List<Order> findByPlayerId(@Param("playerId") Long playerId);
@@ -69,4 +92,36 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Object[]> findDailyIncomeStats(@Param("status") Order.Status status, @Param("startTime") LocalDateTime startTime);
 
     List<Order> findByStatusAndCreatedAtBefore(Order.Status status, LocalDateTime createdAt);
+    
+    List<Order> findByStatusAndCreatedAtAfter(Order.Status status, LocalDateTime createdAt);
+    
+    List<Order> findByBossIdAndStatus(Long bossId, Order.Status status);
+    
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.boss.id = :bossId")
+    long countByBossId(@Param("bossId") Long bossId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    Optional<Order> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE " +
+           "(o.currentPlayer.id = :playerId OR o.currentPlayer2.id = :playerId) " +
+           "AND o.status IN :activeStatuses")
+    long countActiveOrdersByPlayerId(@Param("playerId") Long playerId,
+                                     @Param("activeStatuses") List<Order.Status> activeStatuses);
+
+    List<Order> findByGrabStatusAndGrabLockUntilBefore(Order.GrabStatus grabStatus, LocalDateTime time);
+
+    @Query("SELECT o FROM Order o WHERE o.inGrabHall = true " +
+           "AND o.grabStatus IN :grabStatuses " +
+           "AND (:orderType IS NULL OR o.orderType = :orderType) " +
+           "AND (:playerCount IS NULL OR o.playerCount = :playerCount) " +
+           "ORDER BY o.hallPublishTime DESC")
+    Page<Order> findGrabHallOrders(@Param("grabStatuses") List<Order.GrabStatus> grabStatuses,
+                                   @Param("orderType") String orderType,
+                                   @Param("playerCount") Order.PlayerCount playerCount,
+                                   Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.status = :status AND o.auditStatus = :auditStatus ORDER BY o.completedAt DESC")
+    List<Order> findByStatusAndAuditStatus(@Param("status") Order.Status status, @Param("auditStatus") Integer auditStatus);
 }

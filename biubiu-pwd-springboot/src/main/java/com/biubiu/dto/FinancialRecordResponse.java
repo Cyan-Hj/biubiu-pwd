@@ -11,11 +11,18 @@ import java.time.LocalDateTime;
 @Builder
 public class FinancialRecordResponse {
     private Long id;
-    private FinancialRecord.Type type;
+    private FinancialRecord.Type recordType;
     private BigDecimal amount;
     private String orderNo;
     private String serviceContent;
     private String description;
     private LocalDateTime createdAt;
     private String playerNickname;
+    private String orderType;
+    private String remark;
+    private BigDecimal totalAmount;
+    private BigDecimal serviceHours;
+    private BigDecimal actualHours;
+    private BigDecimal pricePerHour;
+    private String bossInfo;
 }

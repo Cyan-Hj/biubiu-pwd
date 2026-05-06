@@ -13,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
+
+import java.util.HashSet;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,13 +40,31 @@ public class OrderCleanupService {
     private final FinancialRecordRepository financialRecordRepository;
     private final OperationLogRepository operationLogRepository;
     private final UserRepository userRepository;
+    private final DeletedOrderBackupService deletedOrderBackupService;
 
     /**
      * 删除订单关联的截图文件
      */
     private void deleteOrderScreenshots(Order order) {
-        deleteScreenshotFile(order.getStartScreenshotUrl());
-        deleteScreenshotFile(order.getEndScreenshotUrl());
+        Set<String> allUrls = new HashSet<>();
+
+        if (order.getStartScreenshotUrl() != null && !order.getStartScreenshotUrl().isEmpty()) {
+            allUrls.add(order.getStartScreenshotUrl().trim());
+        }
+        if (order.getEndScreenshotUrl() != null && !order.getEndScreenshotUrl().isEmpty()) {
+            allUrls.add(order.getEndScreenshotUrl().trim());
+        }
+        if (order.getScreenshotUrls() != null && !order.getScreenshotUrls().isEmpty()) {
+            for (String url : order.getScreenshotUrls().split(",")) {
+                if (!url.trim().isEmpty()) {
+                    allUrls.add(url.trim());
+                }
+            }
+        }
+
+        for (String url : allUrls) {
+            deleteScreenshotFile(url);
+        }
     }
 
     /**
@@ -108,7 +129,7 @@ public class OrderCleanupService {
         int screenshotCount = 0;
         
         for (Order order : ordersToDelete) {
-            // 删除关联的截图文件
+            deletedOrderBackupService.backupOrder(order);
             deleteOrderScreenshots(order);
             screenshotCount++;
             sessionCount += orderSessionRepository.deleteByOrderId(order.getId());
@@ -173,7 +194,7 @@ public class OrderCleanupService {
         int screenshotCount = 0;
         
         for (Order order : ordersToDelete) {
-            // 删除关联的截图文件
+            deletedOrderBackupService.backupOrder(order);
             deleteOrderScreenshots(order);
             screenshotCount++;
             sessionCount += orderSessionRepository.deleteByOrderId(order.getId());
@@ -183,7 +204,6 @@ public class OrderCleanupService {
         
         orderRepository.deleteAll(ordersToDelete);
         
-        // 如果启用了清除陪玩师累计收入，则清零所有陪玩师的累计收入
         int clearedPlayerCount = 0;
         if (Boolean.TRUE.equals(config.getClearPlayerIncome())) {
             clearedPlayerCount = clearAllPlayersIncome();
@@ -194,10 +214,6 @@ public class OrderCleanupService {
         return new CleanupResult(ordersToDelete.size(), sessionCount, financialCount, operationLogCount, clearedPlayerCount);
     }
     
-    /**
-     * 高级手动清理 - 支持自定义选项
-     * @param request 清理请求参数
-     */
     @Transactional
     public CleanupResult manualCleanupAdvanced(CleanupRequest request) {
         LocalDateTime cutoffDate = request.getCutoffDate();
@@ -227,7 +243,7 @@ public class OrderCleanupService {
         int screenshotCount = 0;
         
         for (Order order : ordersToDelete) {
-            // 删除关联的截图文件
+            deletedOrderBackupService.backupOrder(order);
             deleteOrderScreenshots(order);
             screenshotCount++;
             sessionCount += orderSessionRepository.deleteByOrderId(order.getId());

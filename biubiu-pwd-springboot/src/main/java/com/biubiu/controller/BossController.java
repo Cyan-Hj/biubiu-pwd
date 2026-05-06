@@ -7,6 +7,7 @@ import com.biubiu.entity.BossRechargeRecord;
 import com.biubiu.entity.User;
 import com.biubiu.repository.BossRechargeRecordRepository;
 import com.biubiu.repository.BossRepository;
+import com.biubiu.repository.OrderRepository;
 import com.biubiu.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +31,7 @@ public class BossController {
     private final BossRepository bossRepository;
     private final BossRechargeRecordRepository rechargeRecordRepository;
     private final UserRepository userRepository;
+    private final OrderRepository orderRepository;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
@@ -78,6 +80,10 @@ public class BossController {
         boss.setVipLevel(request.getVipLevel() != null ? request.getVipLevel() : 0);
         boss.setCustomerType(Boss.CustomerType.valueOf(request.getCustomerType()));
         boss.setRemark(request.getRemark());
+        
+        Integer maxNo = bossRepository.findMaxBossNo();
+        int nextNo = (maxNo != null ? maxNo : 0) + 1;
+        boss.setBossNo(String.format("B-%04d", nextNo));
         
         Boss saved = bossRepository.save(boss);
         return ApiResponse.success("老板创建成功", convertToResponse(saved));
@@ -130,8 +136,11 @@ public class BossController {
         Boss boss = bossRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("老板不存在"));
 
-        // 检查是否有未完成的订单关联
-        // 这里可以根据业务需求添加检查逻辑
+        // 检查该老板是否有订单记录
+        long orderCount = orderRepository.countByBossId(id);
+        if (orderCount > 0) {
+            throw new RuntimeException("该老板存在 " + orderCount + " 个订单记录，不能删除");
+        }
 
         bossRepository.delete(boss);
         return ApiResponse.success("老板删除成功", null);
@@ -233,9 +242,103 @@ public class BossController {
         return ApiResponse.success(response);
     }
 
+    @PostMapping("/{id}/recalculate-consumption")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
+    public ApiResponse<BossConsumptionDetailResponse> recalculateConsumption(@PathVariable Long id) {
+        Boss boss = bossRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("老板不存在"));
+        
+        // 查询该老板所有已完成的订单
+        List<com.biubiu.entity.Order> completedOrders = orderRepository.findByBossIdAndStatus(id, com.biubiu.entity.Order.Status.COMPLETED);
+        
+        // 详细计算每个订单的金额
+        List<OrderConsumptionDetail> details = new java.util.ArrayList<>();
+        BigDecimal totalConsumption = BigDecimal.ZERO;
+        
+        for (com.biubiu.entity.Order order : completedOrders) {
+            BigDecimal actualAmount = calculateActualTotalAmount(order);
+            totalConsumption = totalConsumption.add(actualAmount);
+            
+            OrderConsumptionDetail detail = new OrderConsumptionDetail();
+            detail.setOrderNo(order.getOrderNo());
+            detail.setServiceContent(order.getServiceContent());
+            detail.setPricePerHour(order.getPricePerHour());
+            detail.setServiceHours(order.getServiceHours());
+            detail.setActualHours(order.getActualHours());
+            detail.setTotalAmount(order.getTotalAmount());
+            detail.setActualAmount(actualAmount);
+            detail.setCompletedAt(order.getCompletedAt());
+            details.add(detail);
+        }
+        
+        // 保存新的累计消费
+        boss.setTotalConsumption(totalConsumption);
+        Boss saved = bossRepository.save(boss);
+        
+        BossConsumptionDetailResponse response = new BossConsumptionDetailResponse();
+        response.setBossId(saved.getId());
+        response.setBossName(saved.getName());
+        response.setTotalConsumption(totalConsumption);
+        response.setOrderCount(completedOrders.size());
+        response.setOrderDetails(details);
+        
+        return ApiResponse.success("累计消费已重新计算", response);
+    }
+    
+    /**
+     * 计算订单的实际金额（基于实际时长）
+     */
+    private BigDecimal calculateActualTotalAmount(com.biubiu.entity.Order order) {
+        BigDecimal pricePerHour = order.getPricePerHour();
+        BigDecimal createdHours = order.getServiceHours();
+        BigDecimal actualHours = order.getActualHours() != null ? order.getActualHours() : createdHours;
+        
+        if (actualHours.compareTo(createdHours) <= 0) {
+            return createdHours.multiply(pricePerHour);
+        }
+        
+        // 计算超出时间的费用
+        BigDecimal extraMinutes = actualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
+        int totalExtraMinutes = extraMinutes.intValue();
+        int fullHours = totalExtraMinutes / 60;
+        int remainingMinutes = totalExtraMinutes % 60;
+        
+        BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(pricePerHour);
+        if (remainingMinutes > 15 && remainingMinutes <= 45) {
+            extraFee = extraFee.add(pricePerHour.multiply(BigDecimal.valueOf(0.5)));
+        } else if (remainingMinutes > 45) {
+            extraFee = extraFee.add(pricePerHour);
+        }
+        
+        return createdHours.multiply(pricePerHour).add(extraFee);
+    }
+    
+    // DTO for consumption detail
+    @lombok.Data
+    public static class OrderConsumptionDetail {
+        private String orderNo;
+        private String serviceContent;
+        private BigDecimal pricePerHour;
+        private BigDecimal serviceHours;
+        private BigDecimal actualHours;
+        private BigDecimal totalAmount;
+        private BigDecimal actualAmount;
+        private java.time.LocalDateTime completedAt;
+    }
+    
+    @lombok.Data
+    public static class BossConsumptionDetailResponse {
+        private Long bossId;
+        private String bossName;
+        private BigDecimal totalConsumption;
+        private int orderCount;
+        private List<OrderConsumptionDetail> orderDetails;
+    }
+
     private BossResponse convertToResponse(Boss boss) {
         return BossResponse.builder()
                 .id(boss.getId())
+                .bossNo(boss.getBossNo())
                 .name(boss.getName())
                 .contactType(boss.getContactType().name())
                 .contactValue(boss.getContactValue())
@@ -276,6 +379,7 @@ public class BossController {
     @lombok.Builder
     public static class BossResponse {
         private Long id;
+        private String bossNo;
         private String name;
         private String contactType;
         private String contactValue;

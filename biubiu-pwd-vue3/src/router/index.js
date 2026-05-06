@@ -52,6 +52,17 @@ const routes = [
         name: 'Boss',
         component: () => import('@/views/Boss.vue'),
         meta: { roles: ['ADMIN', 'CUSTOMER_SERVICE'] }
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/Profile.vue')
+      },
+      {
+        path: 'grab-hall',
+        name: 'GrabHall',
+        component: () => import('@/views/GrabHall.vue'),
+        meta: { roles: ['PLAYER', 'ADMIN', 'CUSTOMER_SERVICE'] }
       }
     ]
   }

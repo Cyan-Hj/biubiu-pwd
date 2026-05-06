@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -35,6 +36,57 @@ public class FinanceController {
     private final WithdrawalRequestRepository withdrawalRequestRepository;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
+    private final com.biubiu.repository.SystemConfigRepository systemConfigRepository;
+    
+    /**
+     * 计算订单的实际金额（基于实际时长）
+     */
+    private BigDecimal calculateActualTotalAmount(Order order) {
+        if (order.getStatus() != Order.Status.COMPLETED) {
+            return order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
+        }
+        
+        BigDecimal pricePerHour = order.getPricePerHour();
+        BigDecimal createdHours = order.getServiceHours();
+        BigDecimal actualHours = order.getActualHours() != null ? order.getActualHours() : createdHours;
+        
+        if (actualHours.compareTo(createdHours) <= 0) {
+            return createdHours.multiply(pricePerHour);
+        }
+        
+        // 计算超出时间的费用
+        BigDecimal extraMinutes = actualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
+        int totalExtraMinutes = extraMinutes.intValue();
+        int fullHours = totalExtraMinutes / 60;
+        int remainingMinutes = totalExtraMinutes % 60;
+        
+        BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(pricePerHour);
+        if (remainingMinutes > 15 && remainingMinutes <= 45) {
+            extraFee = extraFee.add(pricePerHour.multiply(BigDecimal.valueOf(0.5)));
+        } else if (remainingMinutes > 45) {
+            extraFee = extraFee.add(pricePerHour);
+        }
+        
+        return createdHours.multiply(pricePerHour).add(extraFee);
+    }
+    
+    /**
+     * 计算订单的陪玩师实际收入
+     */
+    private BigDecimal calculateActualPlayerIncome(Order order) {
+        BigDecimal actualTotalAmount = calculateActualTotalAmount(order);
+        BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
+                .map(com.biubiu.entity.SystemConfig::getPlatformFeeRate)
+                .orElse(BigDecimal.valueOf(0.2));
+        
+        BigDecimal totalPlayerIncome = actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+        
+        if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+            return totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+        } else {
+            return totalPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+    }
 
     @GetMapping("/statistics")
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_SERVICE')")
@@ -43,17 +95,28 @@ public class FinanceController {
         LocalDateTime startOfMonth = LocalDateTime.now().withDayOfMonth(1).with(LocalTime.MIN);
         LocalDateTime startOfWeek = LocalDateTime.now().minusDays(6).with(LocalTime.MIN);
 
-        // 订单金额统计（已完成）
-        BigDecimal todayOrderAmount = orderRepository.sumTotalAmountByStatusAndCreatedAtAfter(Order.Status.COMPLETED, startOfDay);
-        BigDecimal monthOrderAmount = orderRepository.sumTotalAmountByStatusAndCreatedAtAfter(Order.Status.COMPLETED, startOfMonth);
-        BigDecimal totalOrderAmount = orderRepository.sumTotalAmountByStatus(Order.Status.COMPLETED);
+        // 获取所有已完成订单并计算实际金额
+        List<Order> todayCompletedOrders = orderRepository.findByStatusAndCreatedAtAfter(Order.Status.COMPLETED, startOfDay);
+        List<Order> monthCompletedOrders = orderRepository.findByStatusAndCreatedAtAfter(Order.Status.COMPLETED, startOfMonth);
+        List<Order> allCompletedOrders = orderRepository.findByStatus(Order.Status.COMPLETED);
+        
+        // 计算实际订单金额（基于实际时长）
+        BigDecimal todayOrderAmount = todayCompletedOrders.stream()
+                .map(this::calculateActualTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal monthOrderAmount = monthCompletedOrders.stream()
+                .map(this::calculateActualTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalOrderAmount = allCompletedOrders.stream()
+                .map(this::calculateActualTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // 订单数量统计（已完成）
-        Long todayOrderCount = orderRepository.countByStatusAndCreatedAtAfter(Order.Status.COMPLETED, startOfDay);
-        Long monthOrderCount = orderRepository.countByStatusAndCreatedAtAfter(Order.Status.COMPLETED, startOfMonth);
-        Long totalOrderCount = orderRepository.countByStatus(Order.Status.COMPLETED);
+        Long todayOrderCount = (long) todayCompletedOrders.size();
+        Long monthOrderCount = (long) monthCompletedOrders.size();
+        Long totalOrderCount = (long) allCompletedOrders.size();
 
-        // 取消订单统计
+        // 取消订单统计（取消订单使用原价）
         BigDecimal todayCancelledAmount = orderRepository.sumTotalAmountByStatusAndCreatedAtAfter(Order.Status.CANCELLED, startOfDay);
         BigDecimal monthCancelledAmount = orderRepository.sumTotalAmountByStatusAndCreatedAtAfter(Order.Status.CANCELLED, startOfMonth);
         BigDecimal totalCancelledAmount = orderRepository.sumTotalAmountByStatus(Order.Status.CANCELLED);
@@ -61,16 +124,51 @@ public class FinanceController {
         Long monthCancelledCount = orderRepository.countByStatusAndCreatedAtAfter(Order.Status.CANCELLED, startOfMonth);
         Long totalCancelledCount = orderRepository.countByStatus(Order.Status.CANCELLED);
 
-        // 收入统计
-        BigDecimal totalPlayerIncome = financialRecordRepository.sumTotalIncome();
+        // 计算实际陪玩师总收入（基于实际金额）
+        BigDecimal totalPlayerIncome = allCompletedOrders.stream()
+                .flatMap(order -> {
+                    BigDecimal actualIncome = calculateActualPlayerIncome(order);
+                    // 双人订单需要计算两个陪玩师的收入
+                    if (order.getPlayerCount() == Order.PlayerCount.DOUBLE && order.getCurrentPlayer() != null && order.getCurrentPlayer2() != null) {
+                        return java.util.stream.Stream.of(
+                            new AbstractMap.SimpleEntry<>(order.getCurrentPlayer().getId(), actualIncome),
+                            new AbstractMap.SimpleEntry<>(order.getCurrentPlayer2().getId(), actualIncome)
+                        );
+                    } else if (order.getCurrentPlayer() != null) {
+                        return java.util.stream.Stream.of(
+                            new AbstractMap.SimpleEntry<>(order.getCurrentPlayer().getId(), actualIncome)
+                        );
+                    }
+                    return java.util.stream.Stream.empty();
+                })
+                .map(Map.Entry::getValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
         BigDecimal totalPlatformIncome = totalOrderAmount.subtract(totalPlayerIncome);
 
         // 收入分布（按类型）- 本月数据
         Map<String, BigDecimal> incomeDistribution = new java.util.HashMap<>();
-        // 本月陪玩师收入
-        BigDecimal monthPlayerIncome = financialRecordRepository.sumIncomeByCreatedAtAfter(startOfMonth);
+        // 本月陪玩师收入（基于实际金额）
+        BigDecimal monthPlayerIncome = monthCompletedOrders.stream()
+                .flatMap(order -> {
+                    BigDecimal actualIncome = calculateActualPlayerIncome(order);
+                    if (order.getPlayerCount() == Order.PlayerCount.DOUBLE && order.getCurrentPlayer() != null && order.getCurrentPlayer2() != null) {
+                        return java.util.stream.Stream.of(
+                            new AbstractMap.SimpleEntry<>(order.getCurrentPlayer().getId(), actualIncome),
+                            new AbstractMap.SimpleEntry<>(order.getCurrentPlayer2().getId(), actualIncome)
+                        );
+                    } else if (order.getCurrentPlayer() != null) {
+                        return java.util.stream.Stream.of(
+                            new AbstractMap.SimpleEntry<>(order.getCurrentPlayer().getId(), actualIncome)
+                        );
+                    }
+                    return java.util.stream.Stream.empty();
+                })
+                .map(Map.Entry::getValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
         if (monthPlayerIncome == null) monthPlayerIncome = BigDecimal.ZERO;
-        // 本月平台抽成 = 本月订单总额 - 本月陪玩师收入
+        // 本月平台抽成 = 本月实际订单总额 - 本月陪玩师实际收入
         BigDecimal monthPlatformIncome = monthOrderAmount.subtract(monthPlayerIncome);
         if (monthPlatformIncome.compareTo(BigDecimal.ZERO) < 0) monthPlatformIncome = BigDecimal.ZERO;
         
@@ -78,23 +176,49 @@ public class FinanceController {
         incomeDistribution.put("平台抽成", monthPlatformIncome);
         incomeDistribution.put("取消订单", monthCancelledAmount != null ? monthCancelledAmount : BigDecimal.ZERO);
 
-        // 最近7天收入记录
-        List<Object[]> dailyStats = orderRepository.findDailyIncomeStats(Order.Status.COMPLETED, startOfWeek);
-        List<FinanceStatsResponse.RecentIncomeRecord> recentIncomes = dailyStats.stream()
-                .map(stat -> FinanceStatsResponse.RecentIncomeRecord.builder()
-                        .date(stat[0].toString())
-                        .amount((BigDecimal) stat[1])
-                        .orderCount(((Number) stat[2]).longValue())
+        // 最近7天收入记录（使用实际金额）
+        List<Order> weekCompletedOrders = orderRepository.findByStatusAndCreatedAtAfter(Order.Status.COMPLETED, startOfWeek);
+        Map<String, java.util.List<Order>> dailyOrders = weekCompletedOrders.stream()
+                .collect(Collectors.groupingBy(order -> order.getCreatedAt().toLocalDate().toString()));
+        
+        List<FinanceStatsResponse.RecentIncomeRecord> recentIncomes = dailyOrders.entrySet().stream()
+                .map(entry -> FinanceStatsResponse.RecentIncomeRecord.builder()
+                        .date(entry.getKey())
+                        .amount(entry.getValue().stream()
+                                .map(this::calculateActualTotalAmount)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add))
+                        .orderCount((long) entry.getValue().size())
                         .build())
+                .sorted((a, b) -> b.getDate().compareTo(a.getDate()))
                 .collect(Collectors.toList());
 
-        // 陪玩师收入排行
-        List<PlayerIncomeSummary> topPlayers = financialRecordRepository.findTopPlayerIncomes(PageRequest.of(0, 10));
-        List<FinanceStatsResponse.PlayerIncomeRank> ranking = topPlayers.stream()
-                .map(p -> FinanceStatsResponse.PlayerIncomeRank.builder()
-                        .playerId(p.getPlayerId())
-                        .nickname(p.getNickname())
-                        .totalIncome(p.getTotalIncome())
+        // 陪玩师收入排行（基于实际收入）
+        Map<Long, String> playerNicknames = new java.util.HashMap<>();
+        Map<Long, BigDecimal> playerIncomes = new java.util.HashMap<>();
+        
+        for (Order order : allCompletedOrders) {
+            BigDecimal actualIncome = calculateActualPlayerIncome(order);
+            
+            if (order.getCurrentPlayer() != null) {
+                Long playerId = order.getCurrentPlayer().getId();
+                playerNicknames.put(playerId, order.getCurrentPlayer().getNickname());
+                playerIncomes.merge(playerId, actualIncome, BigDecimal::add);
+            }
+            
+            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE && order.getCurrentPlayer2() != null) {
+                Long playerId = order.getCurrentPlayer2().getId();
+                playerNicknames.put(playerId, order.getCurrentPlayer2().getNickname());
+                playerIncomes.merge(playerId, actualIncome, BigDecimal::add);
+            }
+        }
+        
+        List<FinanceStatsResponse.PlayerIncomeRank> ranking = playerIncomes.entrySet().stream()
+                .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
+                .limit(10)
+                .map(entry -> FinanceStatsResponse.PlayerIncomeRank.builder()
+                        .playerId(entry.getKey())
+                        .nickname(playerNicknames.getOrDefault(entry.getKey(), "未知"))
+                        .totalIncome(entry.getValue())
                         .build())
                 .collect(Collectors.toList());
 
@@ -138,7 +262,7 @@ public class FinanceController {
     public ApiResponse<IncomeResponse> getIncome() {
         User currentUser = getCurrentUser();
 
-        BigDecimal totalIncome = financialRecordRepository.sumTotalIncomeByPlayerId(currentUser.getId());
+        BigDecimal totalIncome = currentUser.getTotalIncome();
         BigDecimal availableBalance = currentUser.getAvailableBalance();
 
         LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
@@ -201,6 +325,7 @@ public class FinanceController {
         withdrawal.setPaymentMethod(request.getPaymentMethod());
         withdrawal.setAccountInfo(request.getAccountInfo());
         withdrawal.setRealName(request.getRealName());
+        withdrawal.setBankName(request.getBankName());
         withdrawal.setStatus(WithdrawalRequest.Status.pending);
 
         withdrawalRequestRepository.save(withdrawal);
@@ -224,6 +349,42 @@ public class FinanceController {
         return ApiResponse.success(list);
     }
 
+    @GetMapping("/withdraw/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<WithdrawalResponse>> getAllWithdrawals() {
+        List<WithdrawalRequest> withdrawals = withdrawalRequestRepository.findAllByOrderByCreatedAtDesc();
+
+        List<WithdrawalResponse> list = withdrawals.stream()
+                .map(this::convertToWithdrawalResponse)
+                .collect(Collectors.toList());
+
+        return ApiResponse.success(list);
+    }
+
+    @PostMapping("/withdraw/approve-all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Integer> approveAllPendingWithdrawals() {
+        User currentUser = getCurrentUser();
+        List<WithdrawalRequest> pendingList = withdrawalRequestRepository.findPendingRequests();
+        int count = 0;
+        for (WithdrawalRequest withdrawal : pendingList) {
+            withdrawal.setStatus(WithdrawalRequest.Status.approved);
+            withdrawal.setReviewedBy(currentUser);
+            withdrawal.setReviewedAt(LocalDateTime.now());
+
+            FinancialRecord record = new FinancialRecord();
+            record.setPlayer(withdrawal.getPlayer());
+            record.setRecordType(FinancialRecord.Type.withdrawal);
+            record.setAmount(withdrawal.getAmount());
+            record.setDescription("提现到" + (withdrawal.getPaymentMethod() != null ? withdrawal.getPaymentMethod() : "") + "（审核通过）");
+            financialRecordRepository.save(record);
+
+            withdrawalRequestRepository.save(withdrawal);
+            count++;
+        }
+        return ApiResponse.success("批量审核通过 " + count + " 条", count);
+    }
+
     @PostMapping("/withdraw/{id}/review")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> reviewWithdrawal(
@@ -245,10 +406,25 @@ public class FinanceController {
 
         if (request.getStatus() == WithdrawalRequest.Status.rejected) {
             withdrawal.setRejectReason(request.getRejectReason());
-            // 退回金额
             User player = withdrawal.getPlayer();
             player.setAvailableBalance(player.getAvailableBalance().add(withdrawal.getAmount()));
             userRepository.save(player);
+
+            FinancialRecord record = new FinancialRecord();
+            record.setPlayer(player);
+            record.setRecordType(FinancialRecord.Type.withdrawal);
+            record.setAmount(withdrawal.getAmount());
+            record.setDescription("提现被拒绝：" + (request.getRejectReason() != null ? request.getRejectReason() : "无") + "，金额已退回");
+            financialRecordRepository.save(record);
+        }
+
+        if (request.getStatus() == WithdrawalRequest.Status.approved) {
+            FinancialRecord record = new FinancialRecord();
+            record.setPlayer(withdrawal.getPlayer());
+            record.setRecordType(FinancialRecord.Type.withdrawal);
+            record.setAmount(withdrawal.getAmount());
+            record.setDescription("提现到" + (withdrawal.getPaymentMethod() != null ? withdrawal.getPaymentMethod() : "") + "（审核通过）");
+            financialRecordRepository.save(record);
         }
 
         withdrawalRequestRepository.save(withdrawal);
@@ -259,27 +435,40 @@ public class FinanceController {
     private FinancialRecordResponse convertToRecordResponse(FinancialRecord record) {
         return FinancialRecordResponse.builder()
                 .id(record.getId())
-                .type(record.getType())
+                .recordType(record.getRecordType())
                 .amount(record.getAmount())
                 .orderNo(record.getOrder() != null ? record.getOrder().getOrderNo() : null)
                 .serviceContent(record.getOrder() != null ? record.getOrder().getServiceContent() : null)
                 .description(record.getDescription())
                 .createdAt(record.getCreatedAt())
                 .playerNickname(record.getPlayer().getNickname())
+                .orderType(record.getOrder() != null ? record.getOrder().getOrderType() : null)
+                .remark(record.getOrder() != null ? record.getOrder().getRemark() : null)
+                .totalAmount(record.getOrder() != null ? record.getOrder().getTotalAmount() : null)
+                .serviceHours(record.getOrder() != null ? record.getOrder().getServiceHours() : null)
+                .actualHours(record.getOrder() != null ? record.getOrder().getActualHours() : null)
+                .pricePerHour(record.getOrder() != null ? record.getOrder().getPricePerHour() : null)
+                .bossInfo(record.getOrder() != null ? record.getOrder().getBossInfo() : null)
                 .build();
     }
 
     private WithdrawalResponse convertToWithdrawalResponse(WithdrawalRequest withdrawal) {
         return WithdrawalResponse.builder()
                 .id(withdrawal.getId())
+                .playerId(withdrawal.getPlayer().getId())
+                .playerNo(withdrawal.getPlayer().getPlayerNo())
                 .playerNickname(withdrawal.getPlayer().getNickname())
+                .playerPhone(withdrawal.getPlayer().getPhone())
                 .amount(withdrawal.getAmount())
                 .paymentMethod(withdrawal.getPaymentMethod())
                 .accountInfo(withdrawal.getAccountInfo())
                 .realName(withdrawal.getRealName())
+                .idCard(withdrawal.getIdCard())
+                .bankName(withdrawal.getBankName())
                 .status(withdrawal.getStatus())
                 .rejectReason(withdrawal.getRejectReason())
                 .createdAt(withdrawal.getCreatedAt())
+                .reviewedAt(withdrawal.getReviewedAt())
                 .build();
     }
 

@@ -3,13 +3,18 @@ package com.biubiu.service;
 import com.biubiu.dto.AssignOrderRequest;
 import com.biubiu.dto.CompleteOrderRequest;
 import com.biubiu.dto.CreateOrderRequest;
+import com.biubiu.dto.ReplenishOrderRequest;
 import com.biubiu.entity.*;
 import com.biubiu.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -19,6 +24,9 @@ import java.util.Random;
 @RequiredArgsConstructor
 public class OrderService {
 
+    @Value("${file.upload.path:uploads/}")
+    private String uploadPath;
+
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final SystemConfigRepository systemConfigRepository;
@@ -27,6 +35,11 @@ public class OrderService {
     private final OperationLogRepository operationLogRepository;
     private final BossRepository bossRepository;
     private final OrderBalanceService orderBalanceService;
+    private final BossRechargeRecordRepository rechargeRecordRepository;
+    private final GrabWaitingPlayerRepository grabWaitingPlayerRepository;
+    private final GrabPriorityWaitRepository grabPriorityWaitRepository;
+    private final GrabCooldownRepository grabCooldownRepository;
+    private final DeletedOrderBackupService deletedOrderBackupService;
 
     @Transactional
     public Order createOrder(CreateOrderRequest request, User currentUser) {
@@ -49,6 +62,8 @@ public class OrderService {
             order.setPlayerCount(Order.PlayerCount.SINGLE);
         }
 
+        order.setOrderType(request.getOrderType());
+
         // 设置客户类型和老板信息
         if (request.getCustomerType() != null) {
             order.setCustomerType(Order.CustomerType.valueOf(request.getCustomerType()));
@@ -56,7 +71,6 @@ public class OrderService {
             order.setCustomerType(Order.CustomerType.SCATTER);
         }
 
-        BigDecimal shortfall = BigDecimal.ZERO;
         if (request.getBossId() != null && order.getCustomerType() == Order.CustomerType.REGULAR) {
             Boss boss = bossRepository.findById(request.getBossId())
                     .orElseThrow(() -> new RuntimeException("老板不存在"));
@@ -67,24 +81,13 @@ public class OrderService {
 
             // 如果使用余额支付，扣减余额
             if (Boolean.TRUE.equals(request.getUseBalance())) {
-                shortfall = orderBalanceService.deductBalance(order, boss, request.getTotalAmount());
+                orderBalanceService.deductBalance(order, boss, request.getTotalAmount());
             }
         }
 
         Order saved = orderRepository.save(order);
         
-        // 如果有差价，添加到备注
-        String remark = "创建订单";
-        if (shortfall.compareTo(BigDecimal.ZERO) > 0) {
-            remark += "，预存余额不足，需补差价：¥" + shortfall;
-            // 更新订单备注
-            String originalRemark = saved.getRemark();
-            String balanceRemark = "【余额不足】需补差价：¥" + shortfall;
-            saved.setRemark((originalRemark != null ? originalRemark + "\n" : "") + balanceRemark);
-            orderRepository.save(saved);
-        }
-        
-        logOperation(saved, currentUser, "CREATE", null, Order.Status.PENDING_ASSIGN, remark);
+        logOperation(saved, currentUser, "CREATE", null, Order.Status.PENDING_ASSIGN, "创建订单");
         return saved;
     }
 
@@ -95,7 +98,6 @@ public class OrderService {
 
         Order.Status oldStatus = order.getStatus();
 
-        // 允许待分配或待接单状态（支持改派）
         if (order.getStatus() != Order.Status.PENDING_ASSIGN &&
             order.getStatus() != Order.Status.PENDING_ACCEPT &&
             order.getStatus() != Order.Status.PENDING_ACCEPT_2 &&
@@ -103,11 +105,22 @@ public class OrderService {
             throw new RuntimeException("订单状态不正确，无法派单或改派");
         }
 
-        // 双人订单
+        if (Boolean.TRUE.equals(order.getInGrabHall())) {
+            order.setInGrabHall(false);
+            order.setGrabStatus(null);
+            order.setGrabLeader(null);
+            order.setGrabPartner(null);
+            order.setGrabLockUntil(null);
+            order.setPriorityLevel(null);
+            order.setHallPublishTime(null);
+            grabWaitingPlayerRepository.deleteByOrderId(order.getId());
+            grabPriorityWaitRepository.deleteByOrderId(order.getId());
+            grabCooldownRepository.deleteByOrderId(order.getId());
+        }
+
         if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
             assignDoubleOrder(order, request, currentUser, oldStatus);
         } else {
-            // 单人订单
             assignSingleOrder(order, request, currentUser, oldStatus);
         }
     }
@@ -263,6 +276,25 @@ public class OrderService {
         order.setStatus(Order.Status.CANCELLED);
         order.setCancelReason(reason);
         order.setCancelledAt(LocalDateTime.now());
+
+        // 如果订单使用了余额支付，退还扣除的余额
+        if (order.getBoss() != null && order.getBalanceDeducted() != null && order.getBalanceDeducted().compareTo(BigDecimal.ZERO) > 0) {
+            Boss boss = order.getBoss();
+            BigDecimal refundAmount = order.getBalanceDeducted();
+            boss.setBalance(boss.getBalance().add(refundAmount));
+            bossRepository.save(boss);
+
+            com.biubiu.entity.BossRechargeRecord refundRecord = new com.biubiu.entity.BossRechargeRecord();
+            refundRecord.setBossId(boss.getId());
+            refundRecord.setAmount(refundAmount);
+            refundRecord.setType(com.biubiu.entity.BossRechargeRecord.Type.REFUND);
+            refundRecord.setOrderNo(order.getOrderNo());
+            refundRecord.setRemark("取消订单，退还余额¥" + refundAmount);
+            refundRecord.setOperatorId(currentUser.getId());
+            rechargeRecordRepository.save(refundRecord);
+
+            order.setBalanceDeducted(BigDecimal.ZERO);
+        }
 
         orderRepository.save(order);
         logOperation(order, currentUser, "CANCEL", oldStatus, Order.Status.CANCELLED, "取消订单，原因: " + reason);
@@ -447,6 +479,46 @@ public class OrderService {
         currentSession.setActualHours(currentHours);
         orderSessionRepository.save(currentSession);
 
+        // 保存当前陪玩师的截图（追加模式 + 去重，确保双人订单各自的截图都能保存且不重复）
+        java.util.Set<String> allUrls = new java.util.HashSet<>();
+        if (order.getScreenshotUrls() != null && !order.getScreenshotUrls().isEmpty()) {
+            for (String url : order.getScreenshotUrls().split(",")) {
+                if (!url.trim().isEmpty()) allUrls.add(url.trim());
+            }
+        }
+        if (request.getScreenshotUrls() != null && !request.getScreenshotUrls().isEmpty()) {
+            for (String url : request.getScreenshotUrls()) {
+                if (!url.trim().isEmpty()) allUrls.add(url.trim());
+            }
+        }
+        if (!allUrls.isEmpty()) {
+            order.setScreenshotUrls(String.join(",", allUrls));
+        }
+
+        java.util.Set<String> allStartUrls = new java.util.HashSet<>();
+        if (order.getStartScreenshotUrl() != null && !order.getStartScreenshotUrl().isEmpty()) {
+            allStartUrls.add(order.getStartScreenshotUrl().trim());
+        }
+        if (request.getScreenshotUrls() != null && !request.getScreenshotUrls().isEmpty()) {
+            allStartUrls.add(request.getScreenshotUrls().get(0));
+        }
+        if (!allStartUrls.isEmpty()) {
+            order.setStartScreenshotUrl(allStartUrls.iterator().next());
+        }
+
+        java.util.Set<String> allEndUrls = new java.util.HashSet<>();
+        if (order.getEndScreenshotUrl() != null && !order.getEndScreenshotUrl().isEmpty()) {
+            allEndUrls.add(order.getEndScreenshotUrl().trim());
+        }
+        if (request.getScreenshotUrls() != null && request.getScreenshotUrls().size() > 1) {
+            allEndUrls.add(request.getScreenshotUrls().get(1));
+        }
+        if (!allEndUrls.isEmpty()) {
+            order.setEndScreenshotUrl(allEndUrls.iterator().next());
+        }
+
+        orderRepository.save(order);
+
         // 检查是否还有其他陪玩师没有完成
         List<OrderSession> allSessions = orderSessionRepository.findByOrderId(order.getId());
         long activeSessions = allSessions.stream().filter(s -> s.getEndedAt() == null).count();
@@ -462,82 +534,89 @@ public class OrderService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             // 如果没有会话记录（兼容旧数据），使用请求中的时长
-            if (totalActualHours.compareTo(BigDecimal.ZERO) == 0) {
+            if (totalActualHours.compareTo(BigDecimal.ZERO) == 0 && request.getActualHours() != null) {
                 totalActualHours = request.getActualHours();
             }
             order.setActualHours(totalActualHours);
 
-            // 保存截图URL
-            if (request.getStartScreenshotUrl() != null) {
-                order.setStartScreenshotUrl(request.getStartScreenshotUrl());
-            }
-            if (request.getEndScreenshotUrl() != null) {
-                order.setEndScreenshotUrl(request.getEndScreenshotUrl());
-            }
-
-            // 获取当前订单的总金额（不可变）
-            BigDecimal totalAmount = order.getTotalAmount();
-            if (totalAmount == null) {
-                totalAmount = order.getPricePerHour().multiply(order.getServiceHours());
-            }
-
-            // 获取平台抽成比例
-            BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
-                    .map(SystemConfig::getPlatformFeeRate)
-                    .orElse(BigDecimal.valueOf(0.2));
-
-            // 计算所有陪玩师的总可分配收入 = 总金额 * (1 - 抽成比例)
-            BigDecimal totalPlayerIncome = totalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
-
-            // 双人订单：对半分
-            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
-                BigDecimal incomePerPerson = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
-                
-                for (OrderSession session : allSessions) {
-                    if (session.getActualHours() == null || session.getActualHours().compareTo(BigDecimal.ZERO) <= 0) continue;
-
-                    User player = session.getPlayer();
-                    player.setTotalIncome(player.getTotalIncome().add(incomePerPerson));
-                    player.setAvailableBalance(player.getAvailableBalance().add(incomePerPerson));
-                    userRepository.save(player);
-
-                    // 创建财务记录
-                    FinancialRecord record = new FinancialRecord();
-                    record.setOrder(order);
-                    record.setPlayer(player);
-                    record.setType(FinancialRecord.Type.income);
-                    record.setAmount(incomePerPerson);
-                    record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 双人订单对半分)");
-                    financialRecordRepository.save(record);
+            // 保存截图URL（追加模式，避免双人订单覆盖）
+            if (request.getScreenshotUrls() != null && !request.getScreenshotUrls().isEmpty()) {
+                String existingUrls = order.getScreenshotUrls();
+                String newUrls = String.join(",", request.getScreenshotUrls());
+                if (existingUrls != null && !existingUrls.isEmpty()) {
+                    order.setScreenshotUrls(existingUrls + "," + newUrls);
+                } else {
+                    order.setScreenshotUrls(newUrls);
+                }
+                if (order.getStartScreenshotUrl() == null && !request.getScreenshotUrls().isEmpty()) {
+                    order.setStartScreenshotUrl(request.getScreenshotUrls().get(0));
+                }
+                if (order.getEndScreenshotUrl() == null && request.getScreenshotUrls().size() > 1) {
+                    order.setEndScreenshotUrl(request.getScreenshotUrls().get(1));
                 }
             } else {
-                // 单人订单：按服务时长比例分配
-                for (OrderSession session : allSessions) {
-                    if (session.getActualHours() == null || session.getActualHours().compareTo(BigDecimal.ZERO) <= 0) continue;
-
-                    // 该陪玩师服务时长占比
-                    BigDecimal ratio = totalActualHours.compareTo(BigDecimal.ZERO) > 0 ?
-                            session.getActualHours().divide(totalActualHours, 4, java.math.RoundingMode.HALF_UP) : BigDecimal.ONE;
-
-                    // 该陪玩师实际所得
-                    BigDecimal income = totalPlayerIncome.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
-
-                    User player = session.getPlayer();
-                    player.setTotalIncome(player.getTotalIncome().add(income));
-                    player.setAvailableBalance(player.getAvailableBalance().add(income));
-                    userRepository.save(player);
-
-                    // 创建财务记录
-                    FinancialRecord record = new FinancialRecord();
-                    record.setOrder(order);
-                    record.setPlayer(player);
-                    record.setType(FinancialRecord.Type.income);
-                    record.setAmount(income);
-                    record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 占比: " + ratio.multiply(BigDecimal.valueOf(100)).setScale(2) + "%)");
-                    financialRecordRepository.save(record);
+                // 兼容旧版本
+                if (request.getStartScreenshotUrl() != null) {
+                    String existingUrls = order.getScreenshotUrls();
+                    String newUrl = request.getStartScreenshotUrl();
+                    if (existingUrls != null && !existingUrls.isEmpty()) {
+                        order.setScreenshotUrls(existingUrls + "," + newUrl);
+                    } else {
+                        order.setScreenshotUrls(newUrl);
+                    }
+                    if (order.getStartScreenshotUrl() == null) {
+                        order.setStartScreenshotUrl(newUrl);
+                    }
+                }
+                if (request.getEndScreenshotUrl() != null) {
+                    String existingUrls = order.getScreenshotUrls();
+                    String newUrl = request.getEndScreenshotUrl();
+                    if (existingUrls != null && !existingUrls.isEmpty()) {
+                        order.setScreenshotUrls(existingUrls + "," + newUrl);
+                    } else {
+                        order.setScreenshotUrls(newUrl);
+                    }
+                    if (order.getEndScreenshotUrl() == null) {
+                        order.setEndScreenshotUrl(newUrl);
+                    }
                 }
             }
 
+            // 计算订单实际金额
+            // 使用订单总价作为基数（已包含等级单价 + 注意事项加价）
+            BigDecimal actualTotalAmount = order.getTotalAmount();
+            
+            // 陪玩单：如果实际时长大于预约时长，计算超时费用
+            // 护航单：固定价格，不受时长影响
+            if (!"huhang".equals(order.getOrderType())) {
+                BigDecimal createdHours = order.getServiceHours();
+                if (totalActualHours.compareTo(createdHours) > 0) {
+                    BigDecimal actualPricePerHour = order.getTotalAmount().divide(createdHours, 2, java.math.RoundingMode.HALF_UP);
+
+                    BigDecimal extraMinutes = totalActualHours.subtract(createdHours).multiply(BigDecimal.valueOf(60));
+                    int totalExtraMinutes = extraMinutes.intValue();
+                    int fullHours = totalExtraMinutes / 60;
+                    int remainingMinutes = totalExtraMinutes % 60;
+
+                    BigDecimal extraFee = BigDecimal.valueOf(fullHours).multiply(actualPricePerHour);
+                    if (remainingMinutes > 15 && remainingMinutes <= 45) {
+                        extraFee = extraFee.add(actualPricePerHour.multiply(BigDecimal.valueOf(0.5)));
+                    } else if (remainingMinutes > 45) {
+                        extraFee = extraFee.add(actualPricePerHour);
+                    }
+
+                    actualTotalAmount = order.getTotalAmount().add(extraFee);
+                }
+            }
+
+            // 更新老板的累计消费（按实际金额计算）
+            if (order.getBoss() != null) {
+                Boss boss = order.getBoss();
+                boss.setTotalConsumption(boss.getTotalConsumption().add(actualTotalAmount));
+                bossRepository.save(boss);
+            }
+
+            order.setActualTotalAmount(actualTotalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
             orderRepository.save(order);
             logOperation(order, currentUser, "COMPLETE", oldStatus, Order.Status.COMPLETED, "完成订单（所有陪玩师已完成）");
         } else {
@@ -548,24 +627,212 @@ public class OrderService {
     }
 
     @Transactional
+    public void auditOrder(Long orderId, User auditor) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (order.getStatus() != Order.Status.COMPLETED) {
+            throw new RuntimeException("只有已完成的订单才能审核");
+        }
+        if (order.getAuditStatus() != null && order.getAuditStatus() == 1) {
+            throw new RuntimeException("该订单已审核");
+        }
+
+        BigDecimal actualTotalAmount = order.getActualTotalAmount() != null
+                ? order.getActualTotalAmount()
+                : order.getTotalAmount();
+
+        BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
+                .map(SystemConfig::getPlatformFeeRate)
+                .orElse(BigDecimal.valueOf(0.2));
+        BigDecimal totalPlayerIncome = order.getActualIncomeAmount() != null
+                ? order.getActualIncomeAmount()
+                : actualTotalAmount.multiply(BigDecimal.ONE.subtract(platformFeeRate));
+
+        List<OrderSession> allSessions = orderSessionRepository.findByOrderId(order.getId());
+        BigDecimal totalActualHours = allSessions.stream()
+                .map(s -> s.getActualHours() != null ? s.getActualHours() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (totalActualHours.compareTo(BigDecimal.ZERO) == 0 && order.getActualHours() != null) {
+            totalActualHours = order.getActualHours();
+        }
+
+        List<FinancialRecord> existingRecords = financialRecordRepository.findByOrderIdAndRecordType(order.getId(), FinancialRecord.Type.income);
+        if (existingRecords.isEmpty()) {
+            java.util.Map<Long, OrderSession> latestSessionPerPlayer = new java.util.LinkedHashMap<>();
+            for (OrderSession session : allSessions) {
+                Long playerId = session.getPlayer().getId();
+                if (!latestSessionPerPlayer.containsKey(playerId)) {
+                    latestSessionPerPlayer.put(playerId, session);
+                }
+            }
+
+            if (order.getPlayerCount() == Order.PlayerCount.DOUBLE) {
+                BigDecimal incomePerPerson = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+                for (OrderSession session : latestSessionPerPlayer.values()) {
+                    User player = session.getPlayer();
+                    BigDecimal actualReceive = incomePerPerson;
+                    BigDecimal depositDeduct = BigDecimal.ZERO;
+
+                    if (player.getDepositMode() == User.DepositMode.ORDER_DEDUCT
+                            && (player.getDeposit() == null || player.getDeposit().compareTo(player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200)) < 0)) {
+                        BigDecimal shouldDeduct = incomePerPerson.multiply(BigDecimal.valueOf(0.1));
+                        BigDecimal currentDeposit = player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO;
+                        BigDecimal depositLimit = player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200);
+                        BigDecimal remainingNeeded = depositLimit.subtract(currentDeposit);
+                        depositDeduct = shouldDeduct.min(remainingNeeded).max(BigDecimal.ZERO);
+                        actualReceive = incomePerPerson.subtract(depositDeduct);
+                    }
+
+                    player.setTotalIncome(player.getTotalIncome().add(actualReceive));
+                    player.setAvailableBalance(player.getAvailableBalance().add(actualReceive));
+                    if (depositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                        player.setDeposit((player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO).add(depositDeduct));
+                    }
+                    userRepository.save(player);
+
+                    FinancialRecord record = new FinancialRecord();
+                    record.setOrder(order);
+                    record.setPlayer(player);
+                    record.setRecordType(FinancialRecord.Type.income);
+                    record.setAmount(actualReceive);
+                    record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 双人订单对半分)");
+                    financialRecordRepository.save(record);
+
+                    if (depositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                        FinancialRecord depositRecord = new FinancialRecord();
+                        depositRecord.setOrder(order);
+                        depositRecord.setPlayer(player);
+                        depositRecord.setRecordType(FinancialRecord.Type.deposit);
+                        depositRecord.setAmount(depositDeduct);
+                        depositRecord.setDescription("单抵押金扣除 (单号: " + order.getOrderNo() + ", 扣除" + depositDeduct + "元)");
+                        financialRecordRepository.save(depositRecord);
+                    }
+                }
+            } else {
+                for (OrderSession session : latestSessionPerPlayer.values()) {
+                    BigDecimal ratio = BigDecimal.ONE;
+                    if (latestSessionPerPlayer.size() > 1 && totalActualHours.compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal sessionHours = session.getActualHours() != null ? session.getActualHours() : BigDecimal.ZERO;
+                        ratio = sessionHours.divide(totalActualHours, 4, java.math.RoundingMode.HALF_UP);
+                    }
+
+                    BigDecimal income = totalPlayerIncome.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
+                    User player = session.getPlayer();
+                    BigDecimal actualReceive = income;
+                    BigDecimal depositDeduct = BigDecimal.ZERO;
+
+                    if (player.getDepositMode() == User.DepositMode.ORDER_DEDUCT
+                            && (player.getDeposit() == null || player.getDeposit().compareTo(player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200)) < 0)) {
+                        BigDecimal shouldDeduct = income.multiply(BigDecimal.valueOf(0.1));
+                        BigDecimal currentDeposit = player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO;
+                        BigDecimal depositLimit = player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200);
+                        BigDecimal remainingNeeded = depositLimit.subtract(currentDeposit);
+                        depositDeduct = shouldDeduct.min(remainingNeeded).max(BigDecimal.ZERO);
+                        actualReceive = income.subtract(depositDeduct);
+                    }
+
+                    player.setTotalIncome(player.getTotalIncome().add(actualReceive));
+                    player.setAvailableBalance(player.getAvailableBalance().add(actualReceive));
+                    if (depositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                        player.setDeposit((player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO).add(depositDeduct));
+                    }
+                    userRepository.save(player);
+
+                    FinancialRecord record = new FinancialRecord();
+                    record.setOrder(order);
+                    record.setPlayer(player);
+                    record.setRecordType(FinancialRecord.Type.income);
+                    record.setAmount(actualReceive);
+                    record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 占比: " + ratio.multiply(BigDecimal.valueOf(100)).setScale(2) + "%)");
+                    financialRecordRepository.save(record);
+
+                    if (depositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                        FinancialRecord depositRecord = new FinancialRecord();
+                        depositRecord.setOrder(order);
+                        depositRecord.setPlayer(player);
+                        depositRecord.setRecordType(FinancialRecord.Type.deposit);
+                        depositRecord.setAmount(depositDeduct);
+                        depositRecord.setDescription("单抵押金扣除 (单号: " + order.getOrderNo() + ", 扣除" + depositDeduct + "元)");
+                        financialRecordRepository.save(depositRecord);
+                    }
+                }
+            }
+        }
+
+        if (order.getBoss() != null && Boolean.TRUE.equals(order.getUseBalance())) {
+            BigDecimal alreadyDeducted = order.getBalanceDeducted() != null ? order.getBalanceDeducted() : BigDecimal.ZERO;
+            if (actualTotalAmount.compareTo(alreadyDeducted) != 0) {
+                BigDecimal difference = actualTotalAmount.subtract(alreadyDeducted);
+                Boss boss = order.getBoss();
+
+                boss.setBalance(boss.getBalance().subtract(difference));
+                bossRepository.save(boss);
+
+                order.setBalanceDeducted(actualTotalAmount);
+
+                com.biubiu.entity.BossRechargeRecord adjustRecord = new com.biubiu.entity.BossRechargeRecord();
+                adjustRecord.setBossId(boss.getId());
+                adjustRecord.setOrderNo(order.getOrderNo());
+                adjustRecord.setOperatorId(auditor.getId());
+                if (difference.compareTo(BigDecimal.ZERO) > 0) {
+                    adjustRecord.setAmount(difference.negate());
+                    adjustRecord.setType(com.biubiu.entity.BossRechargeRecord.Type.DEDUCT);
+                    adjustRecord.setRemark("审核订单，补扣实际金额差额¥" + difference);
+                } else {
+                    adjustRecord.setAmount(difference.abs());
+                    adjustRecord.setType(com.biubiu.entity.BossRechargeRecord.Type.REFUND);
+                    adjustRecord.setRemark("审核订单，退还多扣金额¥" + difference.abs());
+                }
+                rechargeRecordRepository.save(adjustRecord);
+            }
+        }
+
+        order.setActualIncomeAmount(totalPlayerIncome.setScale(2, java.math.RoundingMode.HALF_UP));
+        order.setAuditStatus(1);
+        order.setAuditedBy(auditor);
+        order.setAuditedAt(LocalDateTime.now());
+        orderRepository.save(order);
+
+        logOperation(order, auditor, "AUDIT", Order.Status.COMPLETED, Order.Status.COMPLETED, "审核通过，发放收入");
+    }
+
+    @Transactional
     public void batchDeleteOrders(List<Long> ids) {
         for (Long id : ids) {
             Order order = orderRepository.findById(id).orElse(null);
             if (order != null) {
-                // 先删除关联的操作日志
+                deletedOrderBackupService.backupOrder(order);
+
                 List<OperationLog> logs = operationLogRepository.findByOrderIdOrderByCreatedAtDesc(id);
                 operationLogRepository.deleteAll(logs);
                 
-                // 删除关联的会话记录
                 List<OrderSession> sessions = orderSessionRepository.findByOrderId(id);
                 orderSessionRepository.deleteAll(sessions);
                 
-                // 删除关联的财务记录
                 List<FinancialRecord> records = financialRecordRepository.findByOrderId(id);
                 financialRecordRepository.deleteAll(records);
                 
-                // 删除订单
+                deleteScreenshotFile(order.getStartScreenshotUrl());
+                deleteScreenshotFile(order.getEndScreenshotUrl());
+                if (order.getScreenshotUrls() != null && !order.getScreenshotUrls().isEmpty()) {
+                    for (String url : order.getScreenshotUrls().split(",")) {
+                        deleteScreenshotFile(url);
+                    }
+                }
+                
                 orderRepository.delete(order);
+            }
+        }
+    }
+
+    private void deleteScreenshotFile(String screenshotUrl) {
+        if (screenshotUrl != null && !screenshotUrl.isEmpty()) {
+            try {
+                String filename = screenshotUrl.replace("/uploads/", "");
+                Path filePath = Paths.get(uploadPath).resolve(filename);
+                Files.deleteIfExists(filePath);
+            } catch (Exception ignored) {
             }
         }
     }
@@ -581,9 +848,356 @@ public class OrderService {
         operationLogRepository.save(log);
     }
 
+    @Transactional
+    public void pauseOrder(Long id, String reason, User currentUser) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        Order.Status oldStatus = order.getStatus();
+
+        boolean isAdminOrCS = currentUser.getRole() == User.Role.ADMIN || currentUser.getRole() == User.Role.CUSTOMER_SERVICE;
+        boolean isPlayer = currentUser.getRole() == User.Role.PLAYER;
+
+        if (isAdminOrCS) {
+            if (order.getStatus() != Order.Status.PENDING_ASSIGN && order.getStatus() != Order.Status.IN_SERVICE) {
+                throw new RuntimeException("管理员/客服只能在待分配或服务中状态下暂存订单");
+            }
+        } else if (isPlayer) {
+            if (order.getStatus() != Order.Status.PENDING_ACCEPT
+                    && order.getStatus() != Order.Status.PENDING_ACCEPT_2
+                    && order.getStatus() != Order.Status.IN_SERVICE) {
+                throw new RuntimeException("陪玩师只能在已接单或服务中状态下暂存订单");
+            }
+            boolean isPlayer1 = order.getCurrentPlayer() != null && order.getCurrentPlayer().getId().equals(currentUser.getId());
+            boolean isPlayer2 = order.getCurrentPlayer2() != null && order.getCurrentPlayer2().getId().equals(currentUser.getId());
+            if (!isPlayer1 && !isPlayer2) {
+                throw new RuntimeException("无权操作此订单");
+            }
+            if (order.getStatus() == Order.Status.PENDING_ACCEPT || order.getStatus() == Order.Status.PENDING_ACCEPT_2) {
+                List<OrderSession> sessions = orderSessionRepository.findByOrderIdAndPlayerId(order.getId(), currentUser.getId());
+                boolean hasActiveSession = sessions.stream().anyMatch(s -> s.getEndedAt() == null);
+                if (!hasActiveSession) {
+                    throw new RuntimeException("您尚未接单，无法暂存");
+                }
+            }
+        } else {
+            throw new RuntimeException("无权操作此订单");
+        }
+
+        if (order.getStatus() == Order.Status.IN_SERVICE) {
+            endCurrentSession(order);
+        }
+
+        order.setStatusBeforePause(oldStatus);
+        order.setStatus(Order.Status.PAUSED);
+        order.setPauseReason(reason);
+        order.setPausedAt(LocalDateTime.now());
+
+        orderRepository.save(order);
+        logOperation(order, currentUser, "PAUSE", oldStatus, Order.Status.PAUSED, "暂存订单，原因: " + reason);
+    }
+
+    @Transactional
+    public void resumeOrder(Long id, User currentUser) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (order.getStatus() != Order.Status.PAUSED) {
+            throw new RuntimeException("订单不是暂存状态，无法恢复");
+        }
+
+        Order.Status oldStatus = order.getStatus();
+        Order.Status targetStatus = order.getStatusBeforePause();
+        if (targetStatus == null) {
+            targetStatus = Order.Status.PENDING_ASSIGN;
+        }
+
+        order.setStatus(targetStatus);
+        order.setResumedAt(LocalDateTime.now());
+
+        if (targetStatus == Order.Status.IN_SERVICE) {
+            if (order.getCurrentPlayer() != null) {
+                OrderSession session = new OrderSession();
+                session.setOrder(order);
+                session.setPlayer(order.getCurrentPlayer());
+                session.setStartedAt(LocalDateTime.now());
+                orderSessionRepository.save(session);
+            }
+            if (order.getCurrentPlayer2() != null) {
+                OrderSession session2 = new OrderSession();
+                session2.setOrder(order);
+                session2.setPlayer(order.getCurrentPlayer2());
+                session2.setStartedAt(LocalDateTime.now());
+                orderSessionRepository.save(session2);
+            }
+        }
+
+        orderRepository.save(order);
+        logOperation(order, currentUser, "RESUME", oldStatus, targetStatus, "恢复订单到: " + targetStatus.name());
+    }
+
+    @Transactional
+    public Order updateOrder(Long id, com.biubiu.dto.UpdateOrderRequest request, User currentUser) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (order.getStatus() == Order.Status.CANCELLED) {
+            throw new RuntimeException("已取消的订单无法修改");
+        }
+
+        BigDecimal oldActualTotalAmount = order.getActualTotalAmount();
+
+        if (request.getBossInfo() != null) {
+            order.setBossInfo(request.getBossInfo());
+        }
+        if (request.getServiceContent() != null) {
+            order.setServiceContent(request.getServiceContent());
+        }
+        if (request.getServiceHours() != null) {
+            order.setServiceHours(request.getServiceHours());
+        }
+        if (request.getPricePerHour() != null) {
+            order.setPricePerHour(request.getPricePerHour());
+        }
+        if (request.getTotalAmount() != null) {
+            order.setTotalAmount(request.getTotalAmount());
+        }
+        if (request.getActualHours() != null) {
+            order.setActualHours(request.getActualHours());
+        }
+        if (request.getActualTotalAmount() != null) {
+            order.setActualTotalAmount(request.getActualTotalAmount());
+        }
+        if (request.getActualIncomeAmount() != null) {
+            order.setActualIncomeAmount(request.getActualIncomeAmount());
+        }
+        if (request.getScheduledTime() != null) {
+            order.setScheduledTime(request.getScheduledTime());
+        }
+        if (request.getRemark() != null) {
+            order.setRemark(request.getRemark());
+        }
+        if (request.getOriginalAmount() != null) {
+            order.setOriginalAmount(request.getOriginalAmount());
+        }
+        if (request.getDiscountRate() != null) {
+            order.setDiscountRate(request.getDiscountRate());
+        }
+
+        if (request.getBossId() != null) {
+            Boss newBoss = bossRepository.findById(request.getBossId())
+                    .orElseThrow(() -> new RuntimeException("老板不存在"));
+            order.setBoss(newBoss);
+            order.setCustomerType(Order.CustomerType.REGULAR);
+        }
+
+        if (request.getUseBalance() != null) {
+            order.setUseBalance(request.getUseBalance());
+        }
+
+        // 同步更新已完成订单的财务记录和陪玩师收入
+        if (order.getStatus() == Order.Status.COMPLETED) {
+            BigDecimal newActualIncomeAmount = order.getActualIncomeAmount();
+
+            List<FinancialRecord> existingRecords = financialRecordRepository.findByOrderId(order.getId());
+            List<FinancialRecord> incomeRecords = existingRecords.stream()
+                    .filter(r -> r.getRecordType() == FinancialRecord.Type.income)
+                    .toList();
+            List<FinancialRecord> depositRecords = existingRecords.stream()
+                    .filter(r -> r.getRecordType() == FinancialRecord.Type.deposit)
+                    .toList();
+
+            if (!incomeRecords.isEmpty() && newActualIncomeAmount != null) {
+                BigDecimal oldRecordTotal = incomeRecords.stream()
+                        .map(FinancialRecord::getAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                if (newActualIncomeAmount.compareTo(oldRecordTotal) != 0) {
+                    // 先回滚旧收入对陪玩师的影响
+                    for (FinancialRecord record : incomeRecords) {
+                        User player = record.getPlayer();
+                        player.setTotalIncome(player.getTotalIncome().subtract(record.getAmount()));
+                        player.setAvailableBalance(player.getAvailableBalance().subtract(record.getAmount()));
+                    }
+                    // 回滚旧押金对陪玩师的影响
+                    for (FinancialRecord record : depositRecords) {
+                        User player = record.getPlayer();
+                        player.setDeposit((player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO).subtract(record.getAmount()));
+                    }
+
+                    // 按比例重新分配新收入，并重新计算押金扣除
+                    for (FinancialRecord record : incomeRecords) {
+                        BigDecimal ratio = oldRecordTotal.compareTo(BigDecimal.ZERO) > 0
+                                ? record.getAmount().divide(oldRecordTotal, 4, java.math.RoundingMode.HALF_UP)
+                                : BigDecimal.ONE.divide(BigDecimal.valueOf(incomeRecords.size()), 4, java.math.RoundingMode.HALF_UP);
+                        BigDecimal newPlayerIncome = newActualIncomeAmount.multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
+
+                        User player = record.getPlayer();
+                        BigDecimal actualReceive = newPlayerIncome;
+                        BigDecimal newDepositDeduct = BigDecimal.ZERO;
+
+                        if (player.getDepositMode() == User.DepositMode.ORDER_DEDUCT) {
+                            BigDecimal depositLimit = player.getDepositLimit() != null ? player.getDepositLimit() : BigDecimal.valueOf(200);
+                            BigDecimal shouldDeduct = newPlayerIncome.multiply(BigDecimal.valueOf(0.1));
+                            BigDecimal currentDeposit = player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO;
+                            BigDecimal remainingNeeded = depositLimit.subtract(currentDeposit);
+                            newDepositDeduct = shouldDeduct.min(remainingNeeded).max(BigDecimal.ZERO);
+                            actualReceive = newPlayerIncome.subtract(newDepositDeduct);
+                        }
+
+                        // 更新收入记录
+                        record.setAmount(actualReceive);
+                        record.setDescription("订单收入 (单号: " + order.getOrderNo() + ", 管理员修改后调整)");
+                        financialRecordRepository.save(record);
+
+                        // 应用新收入
+                        player.setTotalIncome(player.getTotalIncome().add(actualReceive));
+                        player.setAvailableBalance(player.getAvailableBalance().add(actualReceive));
+
+                        // 更新押金记录
+                        if (newDepositDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                            FinancialRecord matchingDeposit = depositRecords.stream()
+                                    .filter(dr -> dr.getPlayer().getId().equals(player.getId()))
+                                    .findFirst()
+                                    .orElse(null);
+
+                            if (matchingDeposit != null) {
+                                matchingDeposit.setAmount(newDepositDeduct);
+                                matchingDeposit.setDescription("单抵押金扣除 (单号: " + order.getOrderNo() + ", 管理员修改后调整)");
+                                financialRecordRepository.save(matchingDeposit);
+                            }
+
+                            player.setDeposit((player.getDeposit() != null ? player.getDeposit() : BigDecimal.ZERO).add(newDepositDeduct));
+                        }
+
+                        userRepository.save(player);
+                    }
+                }
+            }
+
+            // 同步更新老板累计消费
+            BigDecimal newActualTotalAmount = order.getActualTotalAmount();
+            if (newActualTotalAmount != null && order.getBoss() != null) {
+                BigDecimal effectiveOldTotal = oldActualTotalAmount != null ? oldActualTotalAmount : order.getTotalAmount();
+                if (newActualTotalAmount.compareTo(effectiveOldTotal) != 0) {
+                    BigDecimal totalDiff = newActualTotalAmount.subtract(effectiveOldTotal);
+                    Boss boss = order.getBoss();
+                    boss.setTotalConsumption(boss.getTotalConsumption().add(totalDiff));
+                    bossRepository.save(boss);
+                }
+            }
+        }
+
+        Order saved = orderRepository.save(order);
+
+        logOperation(saved, currentUser, "UPDATE", order.getStatus(), order.getStatus(), "修改订单");
+        return saved;
+    }
+
     private String generateOrderNo() {
         String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String random = String.format("%06d", new Random().nextInt(1000000));
         return "DD" + date + random;
+    }
+
+    @Transactional
+    public Order replenishOrder(ReplenishOrderRequest request, User currentUser) {
+        Order order = new Order();
+        order.setOrderNo(generateOrderNo());
+        order.setBossInfo(request.getBossInfo());
+        order.setServiceContent(request.getServiceContent());
+        order.setServiceHours(request.getServiceHours());
+        order.setPricePerHour(request.getPricePerHour());
+        order.setTotalAmount(request.getTotalAmount());
+        order.setScheduledTime(request.getScheduledTime());
+        order.setRemark(request.getRemark());
+        order.setStatus(Order.Status.COMPLETED);
+        order.setCreatedBy(currentUser);
+        order.setActualHours(request.getActualHours() != null ? request.getActualHours() : request.getServiceHours());
+        order.setCompletedAt(request.getOriginalCompletedAt() != null ? request.getOriginalCompletedAt() : LocalDateTime.now());
+        order.setStartedAt(request.getOriginalCreatedAt());
+        order.setCreatedAt(request.getOriginalCreatedAt());
+
+        if ("double".equalsIgnoreCase(request.getPlayerCount())) {
+            order.setPlayerCount(Order.PlayerCount.DOUBLE);
+        } else {
+            order.setPlayerCount(Order.PlayerCount.SINGLE);
+        }
+
+        order.setOrderType(request.getOrderType());
+
+        if (request.getCustomerType() != null) {
+            order.setCustomerType(Order.CustomerType.valueOf(request.getCustomerType()));
+        } else {
+            order.setCustomerType(Order.CustomerType.SCATTER);
+        }
+
+        if (request.getBossId() != null && order.getCustomerType() == Order.CustomerType.REGULAR) {
+            Boss boss = bossRepository.findById(request.getBossId())
+                    .orElseThrow(() -> new RuntimeException("老板不存在"));
+            order.setBoss(boss);
+        }
+
+        if (request.getCurrentPlayerId() != null) {
+            User player = userRepository.findById(request.getCurrentPlayerId())
+                    .orElseThrow(() -> new RuntimeException("陪玩师不存在"));
+            order.setCurrentPlayer(player);
+            order.setAssignedBy(currentUser);
+            order.setAssignedAt(order.getCreatedAt());
+        }
+
+        if (request.getCurrentPlayer2Id() != null) {
+            User player2 = userRepository.findById(request.getCurrentPlayer2Id())
+                    .orElseThrow(() -> new RuntimeException("陪玩师2不存在"));
+            order.setCurrentPlayer2(player2);
+        }
+
+        if (request.getRemark() == null || request.getRemark().isEmpty()) {
+            String originalNo = request.getOriginalOrderNo() != null ? request.getOriginalOrderNo() : "未知";
+            order.setRemark("【补单】原始订单号: " + originalNo);
+        } else {
+            order.setRemark(request.getRemark() + "【补单】原始订单号: " + (request.getOriginalOrderNo() != null ? request.getOriginalOrderNo() : "未知"));
+        }
+
+        Order saved = orderRepository.save(order);
+
+        BigDecimal platformFeeRate = systemConfigRepository.findFirstByOrderByIdAsc()
+                .map(SystemConfig::getPlatformFeeRate)
+                .orElse(BigDecimal.valueOf(0.2));
+        BigDecimal totalPlayerIncome = saved.getTotalAmount().multiply(BigDecimal.ONE.subtract(platformFeeRate));
+
+        if (saved.getCurrentPlayer() != null) {
+            BigDecimal income;
+            String desc;
+            if (saved.getPlayerCount() == Order.PlayerCount.DOUBLE && saved.getCurrentPlayer2() != null) {
+                income = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+                desc = "订单收入 (单号: " + saved.getOrderNo() + ", 双人订单对半分)";
+            } else {
+                income = totalPlayerIncome;
+                desc = "订单收入 (单号: " + saved.getOrderNo() + ")";
+            }
+            FinancialRecord record = new FinancialRecord();
+            record.setOrder(saved);
+            record.setPlayer(saved.getCurrentPlayer());
+            record.setRecordType(FinancialRecord.Type.income);
+            record.setAmount(income);
+            record.setDescription(desc);
+            financialRecordRepository.save(record);
+        }
+
+        if (saved.getCurrentPlayer2() != null) {
+            BigDecimal income = totalPlayerIncome.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+            FinancialRecord record2 = new FinancialRecord();
+            record2.setOrder(saved);
+            record2.setPlayer(saved.getCurrentPlayer2());
+            record2.setRecordType(FinancialRecord.Type.income);
+            record2.setAmount(income);
+            record2.setDescription("订单收入 (单号: " + saved.getOrderNo() + ", 双人订单对半分)");
+            financialRecordRepository.save(record2);
+        }
+
+        logOperation(saved, currentUser, "REPLENISH", null, Order.Status.COMPLETED,
+                "补单创建，原始订单号: " + (request.getOriginalOrderNo() != null ? request.getOriginalOrderNo() : "未知"));
+        return saved;
     }
 }

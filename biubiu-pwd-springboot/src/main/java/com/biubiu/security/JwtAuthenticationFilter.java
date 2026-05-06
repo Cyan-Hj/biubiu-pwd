@@ -1,5 +1,7 @@
 package com.biubiu.security;
 
+import com.biubiu.entity.User;
+import com.biubiu.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +24,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final UserRepository userRepository;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -50,6 +53,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (userPhone != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(userPhone);
             if (jwtService.isTokenValid(jwt, userDetails)) {
+                User user = userRepository.findByPhone(userPhone).orElse(null);
+                Integer tokenVersion = jwtService.extractTokenVersion(jwt);
+                if (user == null || tokenVersion == null || !tokenVersion.equals(user.getTokenVersion())) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,

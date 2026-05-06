@@ -16,6 +16,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true, length = 20)
+    private String playerNo;
+
     @Column(unique = true, nullable = false, length = 11)
     private String phone;
 
@@ -48,6 +51,22 @@ public class User {
     @Column(precision = 10, scale = 2)
     private BigDecimal availableBalance = BigDecimal.ZERO;
 
+    @Column(precision = 10, scale = 2)
+    private BigDecimal deposit = BigDecimal.ZERO;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal depositLimit = BigDecimal.valueOf(200);
+
+    @Column(length = 20)
+    @Enumerated(EnumType.STRING)
+    private DepositMode depositMode = DepositMode.NONE;
+
+    @Column(nullable = false)
+    private Boolean enabled = true;
+
+    @Column(nullable = false)
+    private Integer tokenVersion = 0;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
@@ -60,5 +79,9 @@ public class User {
 
     public enum Status {
         pending, active, disabled
+    }
+
+    public enum DepositMode {
+        NONE, SELF_PAY, ORDER_DEDUCT
     }
 }

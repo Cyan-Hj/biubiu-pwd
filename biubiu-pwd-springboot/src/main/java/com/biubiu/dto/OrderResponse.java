@@ -32,14 +32,27 @@ public class OrderResponse {
     // 扩展信息，可用于列表展示
     private String createdByNickname;
     private String assignedByNickname;
-    private BigDecimal incomeAmount; // 陪玩师在这单的实际收入
+    private BigDecimal incomeAmount; // 陪玩师在这单的收入（预计或实际）
+    private BigDecimal expectedIncomeAmount; // 预计收入（基于订单总价）
+    private BigDecimal actualIncomeAmount; // 实际收入（基于实际时长计算）
+    private BigDecimal actualTotalAmount; // 实际订单金额（基于实际时长计算）
+    private BigDecimal depositDeductAmount; // 单抵金额（本次订单扣押金金额）
     
     // 取消相关信息
     private String cancelReason;
     private LocalDateTime cancelledAt;
     
+    // 暂存相关信息
+    private String pauseReason;
+    private LocalDateTime pausedAt;
+    private LocalDateTime resumedAt;
+    private Integer statusBeforePause;
+    
     // 订单类型（单人/双人）
     private String playerCount;
+    
+    // 订单业务类型（陪玩单/护航单）
+    private String orderType;
     
     // 当前登录用户是否已接单（用于双人订单）
     private Boolean currentUserAccepted;
@@ -56,4 +69,10 @@ public class OrderResponse {
     // 完成订单截图
     private String startScreenshotUrl;
     private String endScreenshotUrl;
+    private List<String> screenshotUrls;
+
+    private Boolean inGrabHall;
+    private String grabStatus;
+    private String priorityLevel;
+    private Integer auditStatus;
 }

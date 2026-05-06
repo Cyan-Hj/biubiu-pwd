@@ -27,6 +27,21 @@ public class SystemConfig {
     @Column(name = "clear_player_income")
     private Boolean clearPlayerIncome = false;
 
+    @Column(name = "grab_team_lock_seconds")
+    private Integer grabTeamLockSeconds = 60;
+
+    @Column(name = "grab_cooldown_seconds")
+    private Integer grabCooldownSeconds = 60;
+
+    @Column(name = "grab_priority_wait_seconds")
+    private Integer grabPriorityWaitSeconds = 300;
+
+    @Column(name = "grab_polling_interval_seconds")
+    private Integer grabPollingIntervalSeconds = 5;
+
+    @Column(name = "grab_enabled")
+    private Boolean grabEnabled = true;
+
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 }

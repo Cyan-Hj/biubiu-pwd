@@ -42,6 +42,9 @@ public class Order {
     @Enumerated(EnumType.ORDINAL)
     private Status status = Status.PENDING_ASSIGN;
 
+    @Column(length = 20)
+    private String orderType;
+
     @ManyToOne
     @JoinColumn(name = "current_player_id")
     private User currentPlayer;
@@ -96,10 +99,27 @@ public class Order {
     @Column(precision = 4, scale = 1)
     private BigDecimal actualHours;
 
+    @Column(precision = 10, scale = 2)
+    private BigDecimal actualTotalAmount;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal actualIncomeAmount;
+
     @Column(columnDefinition = "TEXT")
     private String cancelReason;
 
     private LocalDateTime cancelledAt;
+
+    @Column(columnDefinition = "TEXT")
+    private String pauseReason;
+
+    private LocalDateTime pausedAt;
+
+    private LocalDateTime resumedAt;
+
+    @Column(name = "status_before_pause")
+    @Enumerated(EnumType.ORDINAL)
+    private Status statusBeforePause;
 
     // 完成订单截图
     @Column(name = "start_screenshot_url", length = 500)
@@ -108,13 +128,57 @@ public class Order {
     @Column(name = "end_screenshot_url", length = 500)
     private String endScreenshotUrl;
 
+    @Column(name = "screenshot_urls", columnDefinition = "TEXT")
+    private String screenshotUrls;
+
+    @Column(name = "in_grab_hall")
+    private Boolean inGrabHall = false;
+
+    @Column(name = "hall_publish_time")
+    private LocalDateTime hallPublishTime;
+
+    @Column(name = "grab_lock_until")
+    private LocalDateTime grabLockUntil;
+
+    @ManyToOne
+    @JoinColumn(name = "grab_leader_id")
+    private User grabLeader;
+
+    @ManyToOne
+    @JoinColumn(name = "grab_partner_id")
+    private User grabPartner;
+
+    @Column(name = "grab_status", length = 20)
+    @Enumerated(EnumType.STRING)
+    private GrabStatus grabStatus;
+
+    @Column(name = "priority_level", length = 20)
+    private String priorityLevel;
+
+    @Column(name = "audit_status")
+    private Integer auditStatus = 0;
+
+    @ManyToOne
+    @JoinColumn(name = "audited_by")
+    private User auditedBy;
+
+    private LocalDateTime auditedAt;
+
+    public enum GrabStatus {
+        OPEN,
+        WAITING,
+        LOCKED,
+        ASSIGNED
+    }
+
     public enum Status {
         PENDING_ASSIGN,    // 0: 待分配
         PENDING_ACCEPT,    // 1: 待接单（单人）/ 待接单1（双人第一个）
         PENDING_ACCEPT_2,  // 2: 待接单2（双人第二个）
         IN_SERVICE,        // 3: 服务中
         COMPLETED,         // 4: 已完成
-        CANCELLED          // 5: 已取消
+        CANCELLED,         // 5: 已取消
+        PAUSED             // 6: 暂存
     }
 
     public enum PlayerCount {

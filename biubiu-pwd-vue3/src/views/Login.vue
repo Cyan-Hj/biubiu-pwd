@@ -1,15 +1,20 @@
 <template>
   <div class="login-container">
-    <div class="login-wrapper">
-      <div class="login-brand">
-        <div class="brand-logo">
-          <el-icon size="48"><Monitor /></el-icon>
+    <div class="login-box">
+      <div class="login-header">
+        <div class="brand">
+          <div class="brand-logo">温柚</div>
+          <div class="brand-info">
+            <h1 class="brand-title">温柚纯女电竞</h1>
+            <p class="brand-subtitle">专业 · 品质 · 信赖</p>
+          </div>
         </div>
-        <h1 class="brand-title">Biubiu陪玩</h1>
-        <p class="brand-subtitle">专业游戏陪玩服务平台</p>
       </div>
-      
-      <el-card class="login-box" shadow="hover">
+
+      <div class="login-body">
+        <h2 class="form-title">欢迎登录</h2>
+        <p class="form-desc">请输入您的账号信息</p>
+
         <el-tabs v-model="activeTab" stretch class="login-tabs">
           <el-tab-pane label="账号登录" name="login">
             <el-form :model="loginForm" :rules="rules" ref="loginFormRef" class="login-form">
@@ -25,7 +30,7 @@
                   </template>
                 </el-input>
               </el-form-item>
-              
+
               <el-form-item prop="password">
                 <el-input
                   v-model="loginForm.password"
@@ -40,7 +45,7 @@
                   </template>
                 </el-input>
               </el-form-item>
-              
+
               <el-form-item>
                 <el-button
                   type="primary"
@@ -69,7 +74,7 @@
                   </template>
                 </el-input>
               </el-form-item>
-              
+
               <el-form-item prop="nickname">
                 <el-input
                   v-model="registerForm.nickname"
@@ -82,7 +87,7 @@
                   </template>
                 </el-input>
               </el-form-item>
-              
+
               <el-form-item prop="password">
                 <el-input
                   v-model="registerForm.password"
@@ -96,7 +101,7 @@
                   </template>
                 </el-input>
               </el-form-item>
-              
+
               <el-form-item prop="confirmPassword">
                 <el-input
                   v-model="registerForm.confirmPassword"
@@ -111,7 +116,7 @@
                   </template>
                 </el-input>
               </el-form-item>
-              
+
               <el-form-item>
                 <el-button
                   type="primary"
@@ -126,15 +131,16 @@
             </el-form>
           </el-tab-pane>
         </el-tabs>
-        
-        <div class="login-footer">
-          <p>注册即代表同意 <a href="#">服务协议</a> 和 <a href="#">隐私政策</a></p>
-        </div>
-      </el-card>
+      </div>
+
+      <div class="login-footer">
+        <p>注册即代表同意 <a href="#">服务协议</a> 和 <a href="#">隐私政策</a></p>
+      </div>
     </div>
-    
+
     <div class="login-bg">
-      <div class="bg-pattern"></div>
+      <div class="bg-circle bg-circle-1"></div>
+      <div class="bg-circle bg-circle-2"></div>
     </div>
   </div>
 </template>
@@ -143,7 +149,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Iphone, Lock, User, Monitor } from '@element-plus/icons-vue'
+import { Iphone, Lock, User } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { register } from '@/api/auth'
 
@@ -241,9 +247,10 @@ const handleRegister = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
   position: relative;
   overflow: hidden;
+  padding: 40px 20px;
 }
 
 .login-bg {
@@ -253,98 +260,132 @@ const handleRegister = async () => {
   right: 0;
   bottom: 0;
   overflow: hidden;
-  
-  .bg-pattern {
+  pointer-events: none;
+
+  .bg-circle {
     position: absolute;
-    top: -50%;
-    left: -50%;
-    right: -50%;
-    bottom: -50%;
-    background-image: 
-      radial-gradient(circle at 20% 80%, rgba(64, 158, 255, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(103, 194, 58, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at 40% 40%, rgba(230, 162, 60, 0.1) 0%, transparent 40%);
-    animation: bgFloat 20s ease-in-out infinite;
+    border-radius: 50%;
+    opacity: 0.4;
   }
-}
 
-@keyframes bgFloat {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  33% { transform: translate(30px, -30px) rotate(1deg); }
-  66% { transform: translate(-20px, 20px) rotate(-1deg); }
-}
+  .bg-circle-1 {
+    width: 600px;
+    height: 600px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.1) 100%);
+    top: -200px;
+    right: -200px;
+  }
 
-.login-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 80px;
-  z-index: 1;
-  padding: 40px;
-}
-
-.login-brand {
-  text-align: center;
-  color: #fff;
-  
-  .brand-logo {
-    width: 100px;
-    height: 100px;
-    margin: 0 auto 24px;
-    background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
-    border-radius: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 8px 32px rgba(64, 158, 255, 0.3);
-    animation: logoPulse 2s ease-in-out infinite;
-  }
-  
-  @keyframes logoPulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 8px 32px rgba(64, 158, 255, 0.3); }
-    50% { transform: scale(1.05); box-shadow: 0 12px 40px rgba(64, 158, 255, 0.4); }
-  }
-  
-  .brand-title {
-    font-size: 42px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    background: linear-gradient(135deg, #fff 0%, #a0cfff 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  
-  .brand-subtitle {
-    font-size: 16px;
-    color: rgba(255, 255, 255, 0.7);
-    letter-spacing: 2px;
+  .bg-circle-2 {
+    width: 400px;
+    height: 400px;
+    background: linear-gradient(135deg, rgba(118, 75, 162, 0.1) 0%, rgba(102, 126, 234, 0.08) 100%);
+    bottom: -100px;
+    left: -100px;
   }
 }
 
 .login-box {
-  width: 420px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  
-  :deep(.el-card__body) {
-    padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.login-header {
+  padding: 40px 40px 0;
+  text-align: center;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+
+  .brand-logo {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    flex-shrink: 0;
   }
+
+  .brand-info {
+    text-align: left;
+  }
+
+  .brand-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 4px 0;
+    letter-spacing: 2px;
+  }
+
+  .brand-subtitle {
+    font-size: 13px;
+    color: #909399;
+    margin: 0;
+    letter-spacing: 4px;
+  }
+}
+
+.login-body {
+  padding: 32px 40px 40px;
+}
+
+.form-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+
+.form-desc {
+  font-size: 14px;
+  color: #909399;
+  margin: 0 0 28px 0;
+  text-align: center;
 }
 
 .login-tabs {
   :deep(.el-tabs__header) {
     margin-bottom: 28px;
   }
-  
+
+  :deep(.el-tabs__nav-wrap::after) {
+    height: 1px;
+    background: #e4e7ed;
+  }
+
   :deep(.el-tabs__item) {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 500;
-    
+    color: #606266;
+    padding: 0 24px;
+
     &.is-active {
       font-weight: 600;
+      color: #667eea;
     }
+  }
+
+  :deep(.el-tabs__active-bar) {
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    height: 3px;
+    border-radius: 3px 3px 0 0;
   }
 }
 
@@ -352,58 +393,76 @@ const handleRegister = async () => {
   .el-input {
     :deep(.el-input__wrapper) {
       border-radius: 10px;
-      padding: 4px 15px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-      
+      padding: 4px 16px;
+      box-shadow: 0 0 0 1px #e4e7ed inset;
+      transition: all 0.3s;
+
+      &:hover {
+        box-shadow: 0 0 0 1px #c0c4cc inset;
+      }
+
       &.is-focus {
-        box-shadow: 0 0 0 1px #409eff inset, 0 2px 8px rgba(64, 158, 255, 0.15);
+        box-shadow: 0 0 0 1px #667eea inset, 0 0 0 4px rgba(102, 126, 234, 0.08);
       }
     }
-    
+
     :deep(.el-input__inner) {
-      height: 44px;
+      height: 46px;
       font-size: 15px;
     }
+
+    :deep(.el-input__prefix) {
+      color: #909399;
+    }
   }
-  
+
   .el-form-item {
     margin-bottom: 20px;
+
+    &:last-child {
+      margin-bottom: 0;
+      margin-top: 28px;
+    }
   }
 }
 
 .login-btn {
   width: 100%;
-  height: 48px;
+  height: 50px;
   font-size: 16px;
   font-weight: 600;
   border-radius: 10px;
-  background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
-  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.3);
   transition: all 0.3s ease;
-  
+  letter-spacing: 2px;
+
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(64, 158, 255, 0.4);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
   }
-  
+
   &:active {
     transform: translateY(0);
   }
 }
 
 .login-footer {
-  margin-top: 24px;
+  padding: 20px 40px;
+  background: #fafbfc;
+  border-top: 1px solid #f0f0f0;
   text-align: center;
-  
+
   p {
     font-size: 13px;
     color: #909399;
-    
+    margin: 0;
+
     a {
-      color: #409eff;
+      color: #667eea;
       text-decoration: none;
-      
+      font-weight: 500;
+
       &:hover {
         text-decoration: underline;
       }
@@ -411,21 +470,36 @@ const handleRegister = async () => {
   }
 }
 
-@media (max-width: 900px) {
-  .login-wrapper {
-    flex-direction: column;
-    gap: 40px;
+@media (max-width: 480px) {
+  .login-container {
+    padding: 20px;
+    background: #fff;
   }
-  
-  .login-brand {
-    .brand-title {
-      font-size: 32px;
+
+  .login-box {
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .login-header {
+    padding: 24px 24px 0;
+  }
+
+  .brand {
+    flex-direction: column;
+    gap: 12px;
+
+    .brand-info {
+      text-align: center;
     }
   }
-  
-  .login-box {
-    width: 100%;
-    max-width: 400px;
+
+  .login-body {
+    padding: 24px;
+  }
+
+  .login-footer {
+    padding: 16px 24px;
   }
 }
 </style>

@@ -20,6 +20,10 @@ export const createOrder = (data) => {
   return request.post('/orders', data)
 }
 
+export const updateOrder = (id, data) => {
+  return request.put(`/orders/${id}`, data)
+}
+
 export const assignOrder = (id, data) => {
   return request.post(`/orders/${id}/assign`, data)
 }
@@ -40,6 +44,38 @@ export const cancelOrder = (id, data) => {
   return request.post(`/orders/${id}/cancel`, data)
 }
 
+export const pauseOrder = (id, data) => {
+  return request.post(`/orders/${id}/pause`, data)
+}
+
+export const resumeOrder = (id) => {
+  return request.post(`/orders/${id}/resume`)
+}
+
 export const batchDeleteOrders = (ids) => {
-  return request.delete('/orders/batch', { data: ids })
+  return request.post('/orders/batch', ids)
+}
+
+export const replenishOrder = (data) => {
+  return request.post('/orders/replenish', data)
+}
+
+export const getDeletedBackups = () => {
+  return request.get('/orders/deleted-backups')
+}
+
+export const getDeletedBackup = (orderNo) => {
+  return request.get(`/orders/deleted-backups/${orderNo}`)
+}
+
+export const getPendingAuditOrders = () => {
+  return request.get('/orders/pending-audit')
+}
+
+export const auditPassOrder = (id) => {
+  return request.post(`/orders/${id}/audit-pass`)
+}
+
+export const batchAuditPassOrders = (ids) => {
+  return request.post('/orders/batch-audit-pass', ids)
 }

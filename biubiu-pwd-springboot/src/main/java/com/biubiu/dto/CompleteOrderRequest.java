@@ -1,18 +1,18 @@
 package com.biubiu.dto;
 
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class CompleteOrderRequest {
-    @NotNull(message = "实际时长不能为空")
-    @DecimalMin(value = "0.5", message = "实际时长至少0.5小时")
     private BigDecimal actualHours;
 
-    // 完成订单截图
+    // 新的多张截图列表
+    private List<String> screenshotUrls;
+
+    // 兼容旧版本
     private String startScreenshotUrl;
     private String endScreenshotUrl;
 }

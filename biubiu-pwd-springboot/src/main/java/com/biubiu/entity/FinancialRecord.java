@@ -23,9 +23,9 @@ public class FinancialRecord {
     @JoinColumn(name = "player_id", nullable = false)
     private User player;
 
-    @Column(nullable = false, length = 20)
+    @Column(name = "record_type", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
-    private Type type;
+    private Type recordType;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
@@ -37,6 +37,6 @@ public class FinancialRecord {
     private LocalDateTime createdAt;
 
     public enum Type {
-        income, withdrawal
+        income, withdrawal, replenish, deposit
     }
 }

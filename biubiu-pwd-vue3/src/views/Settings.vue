@@ -123,7 +123,7 @@
               </el-table-column>
               <el-table-column prop="level" label="等级名称" width="150">
                 <template #default="{ row }">
-                  <el-tag :type="getLevelTagType(row.level)" size="large" effect="light">
+                  <el-tag :type="getLevelTagType(row.level)" :color="getLevelTagColor(row.level)" size="large" effect="dark">
                     {{ row.level }}
                   </el-tag>
                 </template>
@@ -365,6 +365,71 @@
             </div>
           </div>
         </el-tab-pane>
+
+        <el-tab-pane label="抢单大厅" name="grabHall">
+          <div class="tab-content">
+            <el-form :model="grabConfigForm" label-width="160px" class="config-form">
+              <el-form-item label="启用抢单大厅">
+                <el-switch
+                  v-model="grabConfigForm.grab_enabled"
+                  active-text="启用"
+                  inactive-text="禁用"
+                />
+                <div class="form-tip">关闭后陪玩师将无法访问抢单大厅</div>
+              </el-form-item>
+              <el-form-item label="固排锁单时间">
+                <el-input-number
+                  v-model="grabConfigForm.grab_team_lock_seconds"
+                  :min="10"
+                  :max="600"
+                  :step="10"
+                  size="large"
+                />
+                <span class="unit-label">秒</span>
+                <div class="form-tip">选择固排后订单被锁定的时间，超时未加入则释放</div>
+              </el-form-item>
+              <el-form-item label="固排超时冷却时间">
+                <el-input-number
+                  v-model="grabConfigForm.grab_cooldown_seconds"
+                  :min="10"
+                  :max="3600"
+                  :step="10"
+                  size="large"
+                />
+                <span class="unit-label">秒</span>
+                <div class="form-tip">固排取消或超时后，发起者在此时间内不能抢该订单</div>
+              </el-form-item>
+              <el-form-item label="优先等待期时间">
+                <el-input-number
+                  v-model="grabConfigForm.grab_priority_wait_seconds"
+                  :min="10"
+                  :max="600"
+                  :step="10"
+                  size="large"
+                />
+                <span class="unit-label">秒</span>
+                <div class="form-tip">低等级玩家抢单后的保护窗口，等待期内无高等级抢占则确认获得</div>
+              </el-form-item>
+              <el-form-item label="前端轮询间隔">
+                <el-input-number
+                  v-model="grabConfigForm.grab_polling_interval_seconds"
+                  :min="3"
+                  :max="30"
+                  :step="1"
+                  size="large"
+                />
+                <span class="unit-label">秒</span>
+                <div class="form-tip">抢单大厅页面自动刷新的间隔时间</div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" size="large" @click="saveGrabConfig" :loading="grabSaving">
+                  <el-icon><Check /></el-icon>
+                  保存设置
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </el-card>
 
@@ -451,6 +516,16 @@ const configForm = reactive({
   clear_player_income: false
 })
 
+const grabConfigForm = reactive({
+  grab_enabled: true,
+  grab_team_lock_seconds: 60,
+  grab_cooldown_seconds: 60,
+  grab_priority_wait_seconds: 300,
+  grab_polling_interval_seconds: 5
+})
+
+const grabSaving = ref(false)
+
 // 手动清理表单
 const manualCleanupForm = reactive({
   cutoffDate: null,
@@ -535,13 +610,27 @@ const formatDate = (date) => {
 
 const getLevelTagType = (level) => {
   const types = {
-    '机密娱乐': '',
+    '机密娱乐': 'primary',
     '绝密娱乐': 'info',
     '机密技术': 'warning',
     '机密金牌': 'danger',
     '机密巅峰': 'success'
   }
   return types[level] || 'primary'
+}
+
+const getLevelTagColor = (level) => {
+  const colors = {
+    '机密娱乐': '#409EFF',
+    '绝密娱乐': '#67C23A',
+    '机密技术': '#E6A23C',
+    '机密金牌': '#F56C6C',
+    '机密巅峰': '#909399',
+    '绝密技术': '#8E44AD',
+    '绝密金牌': '#17A2B8',
+    '绝密巅峰': '#FF69B4'
+  }
+  return colors[level] || '#409EFF'
 }
 
 // ==================== 平台费率方法 ====================
@@ -552,6 +641,11 @@ const loadConfig = async () => {
     configForm.order_cleanup_days = res.data.orderCleanupDays || 30
     configForm.order_cleanup_enabled = res.data.orderCleanupEnabled || false
     configForm.clear_player_income = res.data.clearPlayerIncome || false
+    grabConfigForm.grab_enabled = res.data.grabEnabled !== false
+    grabConfigForm.grab_team_lock_seconds = res.data.grabTeamLockSeconds || 60
+    grabConfigForm.grab_cooldown_seconds = res.data.grabCooldownSeconds || 60
+    grabConfigForm.grab_priority_wait_seconds = res.data.grabPriorityWaitSeconds || 300
+    grabConfigForm.grab_polling_interval_seconds = res.data.grabPollingIntervalSeconds || 5
   } catch (error) {
     ElMessage.error('加载配置失败')
   }
@@ -571,6 +665,24 @@ const saveConfig = async () => {
     ElMessage.error('保存失败')
   } finally {
     saving.value = false
+  }
+}
+
+const saveGrabConfig = async () => {
+  grabSaving.value = true
+  try {
+    await updateSystemConfig({
+      grabEnabled: grabConfigForm.grab_enabled,
+      grabTeamLockSeconds: grabConfigForm.grab_team_lock_seconds,
+      grabCooldownSeconds: grabConfigForm.grab_cooldown_seconds,
+      grabPriorityWaitSeconds: grabConfigForm.grab_priority_wait_seconds,
+      grabPollingIntervalSeconds: grabConfigForm.grab_polling_interval_seconds
+    })
+    ElMessage.success('保存成功')
+  } catch (error) {
+    ElMessage.error('保存失败')
+  } finally {
+    grabSaving.value = false
   }
 }
 
@@ -914,18 +1026,20 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .settings-page {
-  padding: 20px;
-  background: #f5f7fa;
+  padding: 0;
+  background: transparent;
   min-height: 100vh;
 }
 
 .settings-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card);
   
   :deep(.el-card__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(90deg, var(--primary-bg) 0%, transparent 100%);
   }
 }
 
@@ -942,13 +1056,13 @@ onMounted(() => {
   
   .title-icon {
     font-size: 24px;
-    color: #409eff;
+    color: var(--primary-color);
   }
   
   .title-text {
     font-size: 20px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
   }
 }
 
@@ -976,22 +1090,22 @@ onMounted(() => {
     margin: 0 0 20px 0;
     font-size: 16px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
   }
   
   .unit-label {
     margin-left: 10px;
     font-size: 14px;
-    color: #606266;
+    color: var(--text-secondary);
   }
   
   .form-tip {
-    color: #909399;
+    color: var(--text-tertiary);
     font-size: 13px;
     margin-top: 8px;
     
     &.danger {
-      color: #f56c6c;
+      color: var(--danger-dark);
     }
   }
 }
@@ -1003,16 +1117,27 @@ onMounted(() => {
   margin-bottom: 20px;
   
   .level-tip {
-    color: #909399;
+    color: var(--text-tertiary);
     font-size: 13px;
   }
 }
 
 .level-table {
-  :deep(th) {
-    background: #f5f7fa;
-    font-weight: 600;
-    color: #606266;
+  :deep(th.el-table__cell) {
+    background: #f8f9fa !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    font-size: 13px;
+    padding: 12px 8px;
+  }
+
+  :deep(td.el-table__cell) {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  :deep(tr:hover td.el-table__cell) {
+    background: rgba(108, 92, 231, 0.04) !important;
   }
   
   :deep(.el-tag) {
@@ -1022,7 +1147,7 @@ onMounted(() => {
   
   .sort-number {
     font-weight: 600;
-    color: #409eff;
+    color: var(--primary-color);
     font-size: 14px;
   }
 }
@@ -1045,27 +1170,63 @@ onMounted(() => {
   align-items: center;
   gap: 15px;
   padding: 15px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  background: #f8f9fa;
+  border-radius: var(--border-radius);
   
   .sort-tip {
-    color: #909399;
+    color: var(--text-tertiary);
     font-size: 13px;
   }
 }
 
 .level-dialog {
-  :deep(.el-dialog__header) {
-    padding: 20px;
-    border-bottom: 1px solid #ebeef5;
-    
-    .el-dialog__title {
-      font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .settings-card {
+    :deep(.el-card__header) {
+      padding: 12px 14px;
     }
   }
-  
-  :deep(.el-dialog__body) {
-    padding: 25px 20px;
+
+  .header-title {
+    .title-icon {
+      font-size: 20px;
+    }
+
+    .title-text {
+      font-size: 18px;
+    }
+  }
+
+  .config-form {
+    max-width: 100%;
+  }
+
+  .sort-save-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-title {
+    .title-icon {
+      font-size: 18px;
+    }
+
+    .title-text {
+      font-size: 16px;
+    }
+  }
+
+  .settings-tabs {
+    :deep(.el-tabs__item) {
+      font-size: 13px;
+      padding: 0 12px;
+      height: 38px;
+      line-height: 38px;
+    }
   }
 }
 </style>

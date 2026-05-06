@@ -27,29 +27,39 @@ public class AuthController {
 
     @PostMapping("/login")
     public ApiResponse<UserResponse> login(@Valid @RequestBody LoginRequest request) {
+        // 先检查用户是否存在
+        User user = userRepository.findByPhone(request.getPhone())
+                .orElseThrow(() -> new RuntimeException("该手机号未注册，请先注册"));
+
+        // 非管理员账号检查状态
+        if (user.getRole() != User.Role.ADMIN) {
+            if (user.getStatus() == User.Status.pending) {
+                throw new RuntimeException("账号待审核，请联系管理员");
+            }
+
+            if (user.getStatus() == User.Status.disabled) {
+                throw new RuntimeException("账号已被禁用，请联系管理员");
+            }
+        }
+
+        // 再进行密码认证
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getPhone(), request.getPassword())
         );
 
-        User user = userRepository.findByPhone(request.getPhone())
-                .orElseThrow(() -> new RuntimeException("手机号或密码错误"));
-
-        if (user.getStatus() == User.Status.pending) {
-            throw new RuntimeException("账号待审核，请联系管理员");
-        }
-
-        if (user.getStatus() == User.Status.disabled) {
-            throw new RuntimeException("账号已被禁用，请联系管理员");
-        }
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        userRepository.save(user);
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("role", user.getRole().name());
+        claims.put("tokenVersion", user.getTokenVersion());
 
         String token = jwtService.generateToken(claims, (org.springframework.security.core.userdetails.UserDetails) authentication.getPrincipal());
 
         UserResponse response = UserResponse.builder()
                 .id(user.getId())
+                .playerNo(user.getPlayerNo())
                 .phone(user.getPhone())
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())
@@ -68,8 +78,15 @@ public class AuthController {
 
     @PostMapping("/register")
     public ApiResponse<Void> register(@Valid @RequestBody RegisterRequest request) {
+        // 检查手机号是否已注册
         if (userRepository.existsByPhone(request.getPhone())) {
-            throw new RuntimeException("该手机号已注册");
+            throw new RuntimeException("该手机号已注册，请直接登录");
+        }
+
+        // 检查昵称是否已被已通过审核的陪玩师使用
+        if (userRepository.existsByNicknameAndRoleAndStatus(
+                request.getNickname(), User.Role.PLAYER, User.Status.active)) {
+            throw new RuntimeException("该昵称已被使用，请更换其他昵称");
         }
 
         User user = new User();

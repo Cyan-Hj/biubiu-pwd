@@ -17,6 +17,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByPhone(String phone);
 
+    boolean existsByNicknameAndRoleAndStatus(String nickname, User.Role role, User.Status status);
+
     @Query("SELECT u FROM User u WHERE u.role = 'player' " +
            "AND (:status IS NULL OR u.status = :status) " +
            "AND (:level IS NULL OR u.level = :level) " +
@@ -33,7 +35,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     long countByRole(User.Role role);
 
+    boolean existsByRole(User.Role role);
+
     long countByRoleAndStatus(User.Role role, User.Status status);
 
     List<User> findByRole(User.Role role);
+
+    @Query("SELECT MAX(CAST(SUBSTRING(u.playerNo, 3) AS integer)) FROM User u WHERE u.playerNo LIKE 'P-%'")
+    Integer findMaxPlayerNo();
+
+    List<User> findByRoleOrderByCreatedAtDesc(User.Role role);
 }
