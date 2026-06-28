@@ -204,7 +204,7 @@
           <el-form-item label="真实姓名">
             <el-input v-model="withdrawForm.realName" placeholder="请输入真实姓名" />
           </el-form-item>
-          <el-form-item label="身份证号">
+          <el-form-item label="身份证号" v-if="false">
             <el-input v-model="withdrawForm.idCard" placeholder="请输入身份证号" maxlength="18" />
           </el-form-item>
           <el-form-item v-if="withdrawForm.paymentMethod === 'bank'" label="所在银行">

@@ -40,6 +40,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="realName" label="真实姓名" width="100" />
+        <el-table-column prop="idCard" label="身份证号" width="180">
+          <template #default="{ row }">
+            {{ row.idCard || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="createdAt" label="申请时间" width="160">
           <template #default="{ row }">
             {{ formatDate(row.createdAt) }}
@@ -52,6 +57,12 @@
             <el-tag v-else-if="row.status === 'rejected'" type="danger" size="small">已拒绝</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="rejectReason" label="拒绝原因" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="row.status === 'rejected' && row.rejectReason" style="color: #f56c6c;">{{ row.rejectReason }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <template v-if="row.status === 'pending'">
@@ -59,9 +70,7 @@
               <el-button type="danger" size="small" @click="handleReject(row)">拒绝</el-button>
             </template>
             <template v-else>
-              <span class="reviewed-info">
-                {{ formatDate(row.reviewedAt) }}
-              </span>
+              <span style="color: #909399; font-size: 13px;">{{ formatDate(row.reviewedAt) }}</span>
             </template>
           </template>
         </el-table-column>

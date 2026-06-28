@@ -325,6 +325,7 @@ public class FinanceController {
         withdrawal.setPaymentMethod(request.getPaymentMethod());
         withdrawal.setAccountInfo(request.getAccountInfo());
         withdrawal.setRealName(request.getRealName());
+        withdrawal.setIdCard(request.getIdCard());
         withdrawal.setBankName(request.getBankName());
         withdrawal.setStatus(WithdrawalRequest.Status.pending);
 
