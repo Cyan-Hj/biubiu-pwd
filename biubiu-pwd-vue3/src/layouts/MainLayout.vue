@@ -4,10 +4,10 @@
     <el-aside v-if="!isMobile" width="220px" class="aside">
       <div class="logo">
         <div class="logo-icon">
-          <span class="logo-text-icon">温柚</span>
+          <span class="logo-text-icon">电竞</span>
         </div>
         <div class="logo-text">
-          <h3>温柚纯女电竞</h3>
+          <h3>电竞陪玩管理</h3>
           <span>专业 · 品质 · 信赖</span>
         </div>
       </div>
@@ -79,10 +79,10 @@
       <div class="aside mobile-aside">
         <div class="logo">
           <div class="logo-icon">
-            <span class="logo-text-icon">温柚</span>
+            <span class="logo-text-icon">电竞</span>
           </div>
           <div class="logo-text">
-            <h3>温柚纯女电竞</h3>
+            <h3>电竞陪玩管理</h3>
             <span>专业 · 品质 · 信赖</span>
           </div>
         </div>

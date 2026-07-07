@@ -3,9 +3,9 @@
     <div class="login-box">
       <div class="login-header">
         <div class="brand">
-          <div class="brand-logo">温柚</div>
+          <div class="brand-logo">电竞</div>
           <div class="brand-info">
-            <h1 class="brand-title">温柚纯女电竞</h1>
+            <h1 class="brand-title">电竞陪玩管理</h1>
             <p class="brand-subtitle">专业 · 品质 · 信赖</p>
           </div>
         </div>
